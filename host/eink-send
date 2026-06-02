@@ -1,0 +1,5 @@
+#!/bin/sh
+# eink-send — shell wrapper for host/eink_send.py
+# Finds the script relative to its own location.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec python3 "$SCRIPT_DIR/eink_send.py" "$@"
