@@ -1,0 +1,26 @@
+# METABEGIN
+# X-Env-Layer-Name: eink-gadget-usb
+# X-Env-Layer-Category: eink-gadget
+# X-Env-Layer-Desc: Enable USB gadget mode (g_serial) and SPI on Raspberry Pi 4.
+#  Configures dwc2 overlay, loads g_serial at boot, enables SPI.
+# X-Env-Layer-Version: 1.0.0
+# X-Env-Layer-Requires: rpi-boot-firmware
+# METAEND
+---
+mmdebstrap:
+  customize-hooks:
+    # Enable dwc2 overlay for USB gadget support
+    - |-
+      echo "dtoverlay=dwc2" >> $1/boot/firmware/config.txt
+    # Enable SPI for the e-Paper display
+    - |-
+      echo "dtparam=spi=on" >> $1/boot/firmware/config.txt
+    # Load dwc2 and g_serial kernel modules at boot
+    - |-
+      echo "dwc2" > $1/etc/modules-load.d/eink-gadget.conf
+      echo "g_serial" >> $1/etc/modules-load.d/eink-gadget.conf
+    # Create udev symlink for the gadget serial port
+    - |-
+      mkdir -p $1/etc/udev/rules.d
+      printf 'SUBSYSTEM=="tty", KERNEL=="ttyGS0", SYMLINK+="eink-gadget"\n' \
+        > $1/etc/udev/rules.d/99-eink-gadget.rules
