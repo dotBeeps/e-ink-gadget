@@ -1,0 +1,16 @@
+[Unit]
+Description=E-Ink USB Gadget Display Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/e-ink-gadget
+ExecStart=/usr/bin/python3 -m pi.display_daemon --device /dev/ttyGS0 --baud 921600
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
