@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>e-ink Gadget</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a1a;
+    color: #e0e0e0;
+    font-family: system-ui, -apple-system, sans-serif;
+    padding: 1rem;
+    max-width: 640px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #333;
+    margin-bottom: 1.25rem;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 0.6rem 0;
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: #ccc; }
+  .tab-btn.active {
+    color: #fff;
+    border-bottom-color: #4a9eff;
+  }
+
+  /* Tab panes */
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* Cards / sections */
+  .card {
+    background: #242424;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #999;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Form elements */
+  label { display: block; font-size: 0.85rem; color: #bbb; margin-bottom: 0.3rem; }
+  input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 0.5rem;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+  input[type="file"]::file-selector-button {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #e0e0e0;
+    padding: 0.25rem 0.6rem;
+    cursor: pointer;
+    margin-right: 0.5rem;
+  }
+  input[type="color"] {
+    display: block;
+    width: 100%;
+    height: 2.5rem;
+    padding: 0.2rem;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 0.75rem;
+  }
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .color-row label { margin-bottom: 0; white-space: nowrap; }
+  .color-row input[type="color"] { flex: 1; margin-bottom: 0; }
+  .color-row .hex-label {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #999;
+    min-width: 4.5rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: #fff;
+  }
+  .btn-primary { background: #2563eb; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-success { background: #16a34a; }
+  .btn-success:hover { background: #15803d; }
+  .btn-danger { background: #dc2626; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-secondary { background: #555; }
+  .btn-secondary:hover { background: #666; }
+  .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+  /* Canvas preview */
+  .canvas-wrap {
+    text-align: center;
+    margin-top: 0.75rem;
+  }
+  .canvas-wrap canvas {
+    border: 1px solid #444;
+    border-radius: 4px;
+    image-rendering: pixelated;
+    max-width: 100%;
+  }
+
+  /* Status indicator */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #555;
+    flex-shrink: 0;
+  }
+  .status-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+  .status-dot.offline { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
+  .status-dot.checking { background: #facc15; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .status-text { font-size: 0.85rem; color: #aaa; }
+
+  /* Gallery grid */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+  }
+  .gallery-card {
+    background: #2a2a2a;
+    border-radius: 6px;
+    padding: 0.5rem;
+    text-align: center;
+  }
+  .gallery-card img {
+    width: 100%;
+    aspect-ratio: 3/2;
+    object-fit: cover;
+    border-radius: 3px;
+    background: #333;
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+  .gallery-card .filename {
+    font-size: 0.75rem;
+    color: #aaa;
+    word-break: break-all;
+    margin-bottom: 0.4rem;
+    line-height: 1.2;
+  }
+  .gallery-card .btn-group { justify-content: center; }
+
+  /* Message area */
+  .msg {
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+    display: none;
+  }
+  .msg.info { display: block; background: #1e3a5f; color: #93c5fd; }
+  .msg.success { display: block; background: #14532d; color: #86efac; }
+  .msg.error { display: block; background: #5c1a1a; color: #fca5a5; }
+  .msg.hidden { display: none; }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block;
+    width: 1rem; height: 1rem;
+    border: 2px solid #555;
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.3rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<h1>⏺ e-ink Gadget</h1>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="upload">Upload</button>
+  <button class="tab-btn" data-tab="gallery">Gallery</button>
+  <button class="tab-btn" data-tab="control">Control</button>
+</div>
+
+<!-- ======================== Upload Tab ======================== -->
+<div id="tab-upload" class="tab-pane active">
+  <div class="card">
+    <div class="card-title">Upload Image</div>
+    <div id="upload-msg" class="msg"></div>
+
+    <div class="color-row">
+      <label for="upload-bg">Background</label>
+      <input type="color" id="upload-bg" value="#ffffff">
+      <span class="hex-label" id="upload-hex">#ffffff</span>
+    </div>
+
+    <label for="file-input">Choose image</label>
+    <input type="file" id="file-input" accept="image/*">
+
+    <div class="btn-group">
+      <button class="btn btn-primary" id="btn-upload">Upload</button>
+      <button class="btn btn-success" id="btn-upload-display">Upload &amp; Display</button>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="preview-canvas" width="120" height="80"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== Gallery Tab ======================== -->
+<div id="tab-gallery" class="tab-pane">
+  <div class="card">
+    <div class="card-title">Gallery</div>
+    <div id="gallery-msg" class="msg"></div>
+
+    <div class="color-row">
+      <label for="gallery-bg">Background</label>
+      <input type="color" id="gallery-bg" value="#ffffff">
+      <span class="hex-label" id="gallery-hex">#ffffff</span>
+    </div>
+
+    <div class="btn-group" style="margin-bottom:0.75rem">
+      <button class="btn btn-secondary" id="btn-refresh">Refresh</button>
+    </div>
+
+    <div id="gallery-grid" class="gallery-grid">
+      <p style="color:#666;font-size:0.85rem;grid-column:1/-1">No images. Upload one from the Upload tab.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== Control Tab ======================== -->
+<div id="tab-control" class="tab-pane">
+  <div class="card">
+    <div class="card-title">Device Status</div>
+    <div class="status-row">
+      <span class="status-dot checking" id="status-dot"></span>
+      <span class="status-text" id="status-text">Checking&hellip;</span>
+    </div>
+    <div id="control-msg" class="msg"></div>
+
+    <div class="btn-group">
+      <button class="btn btn-danger" id="btn-clear">Clear Display</button>
+      <button class="btn btn-secondary" id="btn-ping">Ping</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ── Helpers ── */
+  function showMsg(el, text, type) {
+    el.className = 'msg ' + type;
+    el.textContent = text;
+  }
+  function hideMsg(el) {
+    el.className = 'msg hidden';
+    el.textContent = '';
+  }
+  function bgHex(input) {
+    return input.value.replace('#', '');
+  }
+
+  /* ── Tab Switching ── */
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const panes = {
+    upload: document.getElementById('tab-upload'),
+    gallery: document.getElementById('tab-gallery'),
+    control: document.getElementById('tab-control'),
+  };
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      tabBtns.forEach(b => b.classList.remove('active'));
+      Object.values(panes).forEach(p => p.classList.remove('active'));
+      this.classList.add('active');
+      const tab = this.dataset.tab;
+      panes[tab].classList.add('active');
+
+      // Auto-load data
+      if (tab === 'gallery') loadGallery();
+      if (tab === 'control') checkStatus();
+    });
+  });
+
+  /* ── Color pickers ── */
+  const uploadBg = document.getElementById('upload-bg');
+  const uploadHex = document.getElementById('upload-hex');
+  uploadBg.addEventListener('input', () => {
+    uploadHex.textContent = uploadBg.value;
+    renderPreview();
+  });
+
+  const galleryBg = document.getElementById('gallery-bg');
+  const galleryHex = document.getElementById('gallery-hex');
+  galleryBg.addEventListener('input', () => {
+    galleryHex.textContent = galleryBg.value;
+  });
+
+  /* ── Canvas Preview (Upload tab) ── */
+  const fileInput = document.getElementById('file-input');
+  const canvas = document.getElementById('preview-canvas');
+  const ctx = canvas.getContext('2d');
+
+  fileInput.addEventListener('change', renderPreview);
+
+  function renderPreview() {
+    const file = fileInput.files && fileInput.files[0];
+    const bgColor = uploadBg.value;
+
+    // Fill background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!file) return;
+
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      img.onload = function() {
+        // Scale to fit canvas maintaining aspect ratio
+        const scale = Math.min(
+          canvas.width / img.width,
+          canvas.height / img.height,
+          1
+        );
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const x = Math.round((canvas.width - w) / 2);
+        const y = Math.round((canvas.height - h) / 2);
+
+        // Re-fill background (in case colour changed since read)
+        ctx.fillStyle = uploadBg.value;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, x, y, w, h);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* ── Upload ── */
+  const btnUpload = document.getElementById('btn-upload');
+  const btnUploadDisplay = document.getElementById('btn-upload-display');
+  const uploadMsg = document.getElementById('upload-msg');
+
+  async function uploadFile() {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) {
+      showMsg(uploadMsg, 'Please select a file first.', 'error');
+      return null;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    hideMsg(uploadMsg);
+    btnUpload.disabled = true;
+    btnUpload.innerHTML = '<span class="spinner"></span>Uploading…';
+
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        showMsg(uploadMsg, data.error || 'Upload failed.', 'error');
+        return null;
+      }
+      showMsg(uploadMsg, 'Uploaded: ' + data.filename, 'success');
+      return data.filename;
+    } catch (err) {
+      showMsg(uploadMsg, 'Network error: ' + err.message, 'error');
+      return null;
+    } finally {
+      btnUpload.disabled = false;
+      btnUpload.textContent = 'Upload';
+    }
+  }
+
+  btnUpload.addEventListener('click', uploadFile);
+
+  btnUploadDisplay.addEventListener('click', async function() {
+    const filename = await uploadFile();
+    if (!filename) return;
+
+    const bg = bgHex(uploadBg);
+    hideMsg(uploadMsg);
+    btnUploadDisplay.disabled = true;
+    btnUploadDisplay.innerHTML = '<span class="spinner"></span>Displaying…';
+
+    try {
+      const res = await fetch('/display/' + filename + '?bg=' + bg, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        showMsg(uploadMsg, data.error || 'Display failed.', 'error');
+      } else {
+        showMsg(uploadMsg, 'Uploaded and displayed on device.', 'success');
+      }
+    } catch (err) {
+      showMsg(uploadMsg, 'Network error: ' + err.message, 'error');
+    } finally {
+      btnUploadDisplay.disabled = false;
+      btnUploadDisplay.textContent = 'Upload & Display';
+    }
+  });
+
+  /* ── Gallery ── */
+  const galleryGrid = document.getElementById('gallery-grid');
+  const galleryMsg = document.getElementById('gallery-msg');
+  const btnRefresh = document.getElementById('btn-refresh');
+
+  async function loadGallery() {
+    hideMsg(galleryMsg);
+    galleryGrid.innerHTML = '<p style="color:#666;font-size:0.85rem;grid-column:1/-1">Loading…</p>';
+
+    try {
+      const res = await fetch('/gallery');
+      const data = await res.json();
+      if (!res.ok) {
+        galleryGrid.innerHTML = '<p style="color:#fca5a5;font-size:0.85rem;grid-column:1/-1">Failed to load gallery.</p>';
+        return;
+      }
+
+      const images = data.images || [];
+      if (images.length === 0) {
+        galleryGrid.innerHTML = '<p style="color:#666;font-size:0.85rem;grid-column:1/-1">No images. Upload one from the Upload tab.</p>';
+        return;
+      }
+
+      galleryGrid.innerHTML = '';
+      images.forEach(img => {
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+
+        const thumb = document.createElement('img');
+        thumb.src = img.url;
+        thumb.alt = img.name;
+        thumb.loading = 'lazy';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'filename';
+        nameEl.textContent = img.name;
+
+        const btnGroup = document.createElement('div');
+        btnGroup.className = 'btn-group';
+
+        const displayBtn = document.createElement('button');
+        displayBtn.className = 'btn btn-success btn-sm';
+        displayBtn.textContent = 'Display';
+        displayBtn.addEventListener('click', function() {
+          displayFromGallery(img.name);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-danger btn-sm';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', function() {
+          deleteFromGallery(img.name);
+        });
+
+        btnGroup.appendChild(displayBtn);
+        btnGroup.appendChild(deleteBtn);
+        card.appendChild(thumb);
+        card.appendChild(nameEl);
+        card.appendChild(btnGroup);
+        galleryGrid.appendChild(card);
+      });
+    } catch (err) {
+      galleryGrid.innerHTML = '<p style="color:#fca5a5;font-size:0.85rem;grid-column:1/-1">Network error loading gallery.</p>';
+    }
+  }
+
+  async function displayFromGallery(name) {
+    const bg = bgHex(galleryBg);
+    hideMsg(galleryMsg);
+    showMsg(galleryMsg, 'Displaying ' + name + '…', 'info');
+
+    try {
+      const res = await fetch('/display/' + encodeURIComponent(name) + '?bg=' + bg, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        showMsg(galleryMsg, data.error || 'Display failed.', 'error');
+      } else {
+        showMsg(galleryMsg, 'Displayed: ' + name, 'success');
+      }
+    } catch (err) {
+      showMsg(galleryMsg, 'Network error: ' + err.message, 'error');
+    }
+  }
+
+  async function deleteFromGallery(name) {
+    if (!confirm('Delete "' + name + '" permanently?')) return;
+    hideMsg(galleryMsg);
+
+    try {
+      const res = await fetch('/image/' + encodeURIComponent(name), { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        showMsg(galleryMsg, data.error || 'Delete failed.', 'error');
+      } else {
+        showMsg(galleryMsg, 'Deleted: ' + name, 'success');
+        loadGallery();
+      }
+    } catch (err) {
+      showMsg(galleryMsg, 'Network error: ' + err.message, 'error');
+    }
+  }
+
+  btnRefresh.addEventListener('click', loadGallery);
+
+  /* ── Control ── */
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const controlMsg = document.getElementById('control-msg');
+  const btnClear = document.getElementById('btn-clear');
+  const btnPing = document.getElementById('btn-ping');
+
+  async function checkStatus() {
+    statusDot.className = 'status-dot checking';
+    statusText.textContent = 'Checking…';
+
+    try {
+      const res = await fetch('/');
+      const data = await res.json();
+      if (res.ok && data.status === 'ok') {
+        statusDot.className = 'status-dot online';
+        statusText.textContent = 'Online — ' + (data.gallery_count || 0) + ' images in gallery';
+      } else {
+        statusDot.className = 'status-dot offline';
+        statusText.textContent = 'Error: unexpected response';
+      }
+    } catch (err) {
+      statusDot.className = 'status-dot offline';
+      statusText.textContent = 'Offline — ' + err.message;
+    }
+  }
+
+  btnClear.addEventListener('click', async function() {
+    hideMsg(controlMsg);
+    showMsg(controlMsg, 'Clearing display…', 'info');
+    btnClear.disabled = true;
+
+    try {
+      const res = await fetch('/clear', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        showMsg(controlMsg, data.error || 'Clear failed.', 'error');
+      } else {
+        showMsg(controlMsg, 'Display cleared.', 'success');
+      }
+    } catch (err) {
+      showMsg(controlMsg, 'Network error: ' + err.message, 'error');
+    } finally {
+      btnClear.disabled = false;
+    }
+  });
+
+  btnPing.addEventListener('click', async function() {
+    hideMsg(controlMsg);
+    showMsg(controlMsg, 'Pinging…', 'info');
+
+    try {
+      const res = await fetch('/ping');
+      const data = await res.json();
+      if (res.ok && data.status === 'ok') {
+        showMsg(controlMsg, 'Pong! Device is responsive.', 'success');
+      } else {
+        showMsg(controlMsg, 'Unexpected response.', 'error');
+      }
+    } catch (err) {
+      showMsg(controlMsg, 'Network error: ' + err.message, 'error');
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
