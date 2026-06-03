@@ -61,6 +61,30 @@ done
 modprobe dwc2 2>/dev/null || warn "dwc2 module not available (expected before reboot)"
 modprobe libcomposite 2>/dev/null || warn "libcomposite module not available (expected before reboot)"
 
+# Remove old g_serial module — it grabs the UDC at boot and blocks configfs
+if lsmod | grep -q '^g_serial'; then
+    info "Detaching g_serial module (old serial gadget)"
+    # Unbind any existing gadget from UDC first
+    for gadget_dir in /sys/kernel/config/usb_gadget/*/; do
+        [[ -d "$gadget_dir" ]] || continue
+        udc_file="${gadget_dir}UDC"
+        if [[ -f "$udc_file" ]] && [[ -n "$(cat "$udc_file" 2>/dev/null)" ]]; then
+            echo '' > "$udc_file" 2>/dev/null || true
+        fi
+    done
+    rmmod g_serial 2>/dev/null || warn "Could not rmmod g_serial — may need reboot"
+    ok "g_serial module removed"
+    sleep 1
+fi
+
+# Remove g_serial from /etc/modules so it doesn't return on reboot
+MODULES_FILE=/etc/modules
+if grep -qx 'g_serial' "${MODULES_FILE}" 2>/dev/null; then
+    info "Removing g_serial from ${MODULES_FILE}"
+    sed -i '/^g_serial$/d' "${MODULES_FILE}"
+    ok "Removed g_serial from ${MODULES_FILE}"
+fi
+
 # ── 5. Configfs USB gadget setup ──────────────────────────────────────────
 GADGET_PATH=/sys/kernel/config/usb_gadget/eink
 
@@ -154,8 +178,29 @@ else
     if [[ -n "${UDC_DEVICE}" ]]; then
         # Ensure the UDC file exists (it's created when the gadget is set up properly)
         if [[ -f "${GADGET_PATH}/UDC" ]]; then
-            echo "${UDC_DEVICE}" > "${GADGET_PATH}/UDC"
-            ok "Bound gadget to UDC device: ${UDC_DEVICE}"
+            if ! echo "${UDC_DEVICE}" > "${GADGET_PATH}/UDC" 2>/dev/null; then
+                # UDC is busy — reload dwc2 to force-release it
+                warn "UDC busy — reloading dwc2 driver"
+                for gadget_dir in /sys/kernel/config/usb_gadget/*/; do
+                    [[ -d "$gadget_dir" ]] || continue
+                    udc_file="${gadget_dir}UDC"
+                    if [[ -f "$udc_file" ]] && [[ -n "$(cat "$udc_file" 2>/dev/null)" ]]; then
+                        echo '' > "$udc_file" 2>/dev/null || true
+                    fi
+                done
+                rmmod dwc2 2>/dev/null || true
+                sleep 1
+                modprobe dwc2 2>/dev/null
+                sleep 1
+                # Try binding again
+                if echo "${UDC_DEVICE}" > "${GADGET_PATH}/UDC" 2>/dev/null; then
+                    ok "Bound gadget to UDC device: ${UDC_DEVICE} (after dwc2 reload)"
+                else
+                    warn "Still could not bind UDC — a reboot is required"
+                fi
+            else
+                ok "Bound gadget to UDC device: ${UDC_DEVICE}"
+            fi
         else
             warn "UDC file not found in gadget config — binding skipped"
         fi
