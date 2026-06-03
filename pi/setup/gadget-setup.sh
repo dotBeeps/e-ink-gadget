@@ -68,35 +68,44 @@ GADGET_PATH=/sys/kernel/config/usb_gadget/eink
 if [[ -d "${GADGET_PATH}" ]]; then
     info "Tearing down existing eink gadget at ${GADGET_PATH}"
 
-    # Unbind from UDC if bound
-    if [[ -f "${GADGET_PATH}/UDC" ]] && [[ -n "$(cat "${GADGET_PATH}/UDC" 2>/dev/null)" ]]; then
-        echo '' > "${GADGET_PATH}/UDC" 2>/dev/null || true
-        ok "Unbound gadget from UDC"
+    # Stop eink-gadget service so nothing holds /dev/ttyGS[0-9]*
+    if systemctl is-active --quiet eink-gadget 2>/dev/null; then
+        info "Stopping eink-gadget service to release serial port"
+        systemctl stop eink-gadget 2>/dev/null || true
+        sleep 1
     fi
 
-    # Remove function symlinks from config
-    for func in acm.usb1 ecm.usb0; do
-        if [[ -L "${GADGET_PATH}/configs/c.1/${func}" ]]; then
-            rm -f "${GADGET_PATH}/configs/c.1/${func}"
-            ok "Removed symlink configs/c.1/${func}"
-        fi
+    # Kill any remaining process holding ttyGS[0-9]*
+    for tty in /dev/ttyGS[0-9]*; do
+        [[ -e "$tty" ]] || continue
+        for pid in $(fuser "$tty" 2>/dev/null); do
+            info "Killing PID $pid holding $tty"
+            kill "$pid" 2>/dev/null || true
+        done
     done
+    sleep 0.5
 
-    # Clean up string directories
-    rm -rf "${GADGET_PATH}/configs/c.1/strings/0x409" 2>/dev/null || true
-    rm -rf "${GADGET_PATH}/strings/0x409" 2>/dev/null || true
+    # Unbind from UDC if bound
+    if [[ -f "${GADGET_PATH}/UDC" ]] && [[ -n "$(cat "${GADGET_PATH}/UDC" 2>/dev/null)" ]]; then
+        echo '' > "${GADGET_PATH}/UDC" 2>/dev/null || \
+            warn "Could not unbind UDC — will attempt rm -rf anyway"
+        ok "Unbind command sent"
+    fi
 
-    # Remove function directories
+    # Aggressive teardown: rm -rf the whole configfs tree for this gadget
+    # configfs allows rm -rf on non-UDC-bound gadgets; after unbind above
+    # this should succeed. We remove configs first to force the unbind.
+    if [[ -L "${GADGET_PATH}/configs/c.1" ]]; then
+        rm -f "${GADGET_PATH}/configs/c.1/"* 2>/dev/null || true
+        rmdir "${GADGET_PATH}/configs/c.1" 2>/dev/null || true
+    fi
     for func in acm.usb1 ecm.usb0; do
         if [[ -d "${GADGET_PATH}/functions/${func}" ]]; then
-            rmdir "${GADGET_PATH}/functions/${func}" 2>/dev/null || \
-                warn "Could not remove ${GADGET_PATH}/functions/${func} (might need a reboot)"
+            rmdir "${GADGET_PATH}/functions/${func}" 2>/dev/null || true
         fi
     done
-
-    # Remove config and gadget directories
-    rmdir "${GADGET_PATH}/configs/c.1" 2>/dev/null || true
-    rmdir "${GADGET_PATH}" 2>/dev/null || true
+    # Final: remove any remaining children and the gadget itself
+    find "${GADGET_PATH}" -depth -delete 2>/dev/null || true
 
     ok "Existing gadget torn down"
 fi
@@ -143,8 +152,13 @@ else
     # ── Enable gadget (bind to UDC) ───────────────────────────────────────
     UDC_DEVICE=$(find /sys/class/udc/ -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | head -1)
     if [[ -n "${UDC_DEVICE}" ]]; then
-        echo "${UDC_DEVICE}" > "${GADGET_PATH}/UDC"
-        ok "Bound gadget to UDC device: ${UDC_DEVICE}"
+        # Ensure the UDC file exists (it's created when the gadget is set up properly)
+        if [[ -f "${GADGET_PATH}/UDC" ]]; then
+            echo "${UDC_DEVICE}" > "${GADGET_PATH}/UDC"
+            ok "Bound gadget to UDC device: ${UDC_DEVICE}"
+        else
+            warn "UDC file not found in gadget config — binding skipped"
+        fi
     else
         warn "No UDC device found — gadget will be enabled after reboot"
     fi
