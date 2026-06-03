@@ -8,8 +8,11 @@ Spectra 6 display driver, and returns ACK/ERROR responses.
 from __future__ import annotations
 
 import logging
+import threading
 
 from PIL import Image
+
+from pi.web import create_app
 
 from pi.eink_driver import DisplayError, EInkDisplay
 from pi.protocol import (
@@ -129,17 +132,36 @@ def _process_image(frame: Frame, display: EInkDisplay) -> bytes:
         return Frame.error(ERROR_MALFORMED)
 
 
+def _process_frame_with_lock(
+    frame: Frame,
+    display: EInkDisplay,
+    lock: threading.Lock,
+) -> bytes:
+    """Process one frame while holding the display lock.
+
+    Args:
+        frame: A parsed protocol Frame.
+        display: An initialised EInkDisplay instance.
+        lock: A threading.Lock that protects display access.
+
+    Returns:
+        A 6-byte ACK or ERROR response.
+    """
+    with lock:
+        return process_frame(frame, display)
+
+
 # ── daemon loop ───────────────────────────────────────────────────────────────
 
 
 def run_daemon(
-    device: str = "/dev/ttyGS0",
+    serial_device: str = "/dev/ttyGS0",
     baud: int = 921600,
 ) -> None:
     """Run the display daemon main loop.
 
     Args:
-        device: Serial device path (USB gadget).
+        serial_device: Serial device path (USB gadget).
         baud: Baud rate for the serial connection.
     """
     import serial  # noqa: PLC0415
@@ -149,10 +171,32 @@ def run_daemon(
     display.clear()
     logger.info("Display initialised and cleared")
 
+    display_lock = threading.Lock()
+
+    # Start the Flask web app in a background daemon thread
+    app = create_app(
+        display=display,
+        display_lock=display_lock,
+        gallery_dir="/home/pi/eink-gadget/gallery",
+    )
+    flask_thread = threading.Thread(
+        target=app.run,
+        kwargs={
+            "host": "0.0.0.0",
+            "port": 8080,
+            "threaded": True,
+            "debug": False,
+            "use_reloader": False,
+        },
+        daemon=True,
+    )
+    flask_thread.start()
+    logger.info("Flask web app started on http://0.0.0.0:8080")
+
     parser = FrameParser()
 
-    with serial.Serial(device, baud, timeout=0.1) as ser:
-        logger.info("Serial port %s opened at %d baud", device, baud)
+    with serial.Serial(serial_device, baud, timeout=0.1) as ser:
+        logger.info("Serial port %s opened at %d baud", serial_device, baud)
 
         while True:
             try:
@@ -172,16 +216,17 @@ def run_daemon(
                 continue
 
             for frame in frames:
-                response = process_frame(frame, display)
+                response = _process_frame_with_lock(frame, display, display_lock)
 
                 # If we just processed a SLEEP command, re-init before next frame
                 if frame.cmd == CMD_SLEEP:
-                    try:
-                        display.init()
-                        logger.info("Display re-initialised after sleep")
-                    except DisplayError:
-                        logger.exception("Display re-init after sleep failed")
-                        response = Frame.error(ERROR_DISPLAY)
+                    with display_lock:
+                        try:
+                            display.init()
+                            logger.info("Display re-initialised after sleep")
+                        except DisplayError:
+                            logger.exception("Display re-init after sleep failed")
+                            response = Frame.error(ERROR_DISPLAY)
 
                 try:
                     ser.write(response)
