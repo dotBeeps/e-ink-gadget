@@ -1,6 +1,7 @@
 [Unit]
 Description=E-Ink USB Gadget Display Daemon
-After=network.target
+After=network.target eink-gadget-setup.service
+Requires=eink-gadget-setup.service
 
 [Service]
 Type=simple

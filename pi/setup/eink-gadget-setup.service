@@ -1,0 +1,12 @@
+[Unit]
+Description=E-Ink Gadget USB configfs setup
+Before=eink-gadget.service
+Wants=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /home/pi/eink-gadget/pi/setup/gadget-usb.sh
+
+[Install]
+WantedBy=multi-user.target

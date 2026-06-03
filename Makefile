@@ -17,7 +17,11 @@ deploy-rpi:
 install-service: deploy-rpi
 	ssh "$(PI_USER)@$(PI_HOST)" "\
 		sudo cp $(PI_DIR)/pi/setup/eink-gadget.service /etc/systemd/system/ && \
+		sudo cp $(PI_DIR)/pi/setup/eink-gadget-setup.service /etc/systemd/system/ && \
+		sudo cp $(PI_DIR)/pi/setup/gadget-usb.sh /opt/e-ink-gadget/pi/setup/gadget-usb.sh && \
+		sudo chmod +x /opt/e-ink-gadget/pi/setup/gadget-usb.sh && \
 		sudo systemctl daemon-reload && \
+		sudo systemctl enable --now eink-gadget-setup && \
 		sudo systemctl enable --now eink-gadget \
 	"
 

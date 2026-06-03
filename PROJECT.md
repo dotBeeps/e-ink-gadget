@@ -40,8 +40,10 @@ pi/
 │   ├── epd4in0e.py      # EPD class: init, getbuffer, display, Clear, sleep
 │   └── epdconfig.py     # SPI/GPIO hardware abstraction (spidev + gpiozero)
 └── setup/
-    ├── gadget-setup.sh  # One-shot RPi 4 configfs gadget config (serial+ethernet)
-    └── eink-gadget.service # systemd unit for auto-start
+    ├── gadget-setup.sh   # Full one-shot RPi 4 configfs setup (serial+ethernet + packages)
+    ├── gadget-usb.sh     # Boot-time USB gadget configfs setup (no packages, minimal)
+    ├── eink-gadget.service         # systemd unit for display daemon
+    └── eink-gadget-setup.service   # systemd unit for boot-time USB gadget setup
 
 host/
 ├── eink_send.py         # CLI tool: send images to display over USB serial
