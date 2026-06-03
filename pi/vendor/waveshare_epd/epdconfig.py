@@ -141,7 +141,11 @@ class RaspberryPi:
         else:
             # SPI device, bus = 0, device = 0
             self.SPI.open(0, 0)
-            self.SPI.max_speed_hz = 4000000
+            # Waveshare's stock driver uses 4 MHz for broad compatibility.
+            # The Pi 4B hardware SPI path and this panel tolerate a higher
+            # transfer clock; 16 MHz cuts the 120 KiB frame upload from
+            # ~240 ms to ~60 ms while staying conservative for the HAT+ wiring.
+            self.SPI.max_speed_hz = 16000000
             self.SPI.mode = 0b00
         return 0
 
