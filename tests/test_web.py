@@ -134,6 +134,7 @@ class TestStatus:
         assert data["scale_modes"] == ["fill", "fit", "original", "stretch"]
         assert data["default_settings"]["background"] == "ffffff"
         assert data["default_settings"]["scale_mode"] == "fit"
+        assert data["default_settings"]["rotation"] == 0
         assert data["active"] is None
         assert "gallery_count" in data
 
@@ -150,6 +151,9 @@ class TestStatus:
         assert b'id="scale-mode"' in resp.data
         assert b'id="crop-x"' in resp.data
         assert b'id="crop-y"' in resp.data
+        assert b'id="rotation"' in resp.data
+        assert b'id="rotation-label"' in resp.data
+        assert b'max="270" step="90"' in resp.data
         assert b'id="brightness"' in resp.data
         assert b'id="contrast"' in resp.data
         assert b'id="saturation"' in resp.data
@@ -506,6 +510,27 @@ class TestDisplay:
         assert active["settings"]["scale_mode"] == "fill"
         assert active["settings"]["scale"] == 1.25
 
+    def test_display_snaps_rotation_to_90_degree_increments(self, client, gallery_dir):
+        """Rotation settings are normalized to snapped quarter-turn values."""
+        img = Image.new("RGBA", (20, 10), (255, 0, 0, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "rotate-snap.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 255, 255))
+            resp = client.post(f"/display/{filename}", json={"rotation": 91})
+
+        assert resp.status_code == 200
+        active = resp.get_json()["active"]
+        assert active["settings"]["rotation"] == 90
+
         gallery_resp = client.get("/gallery")
         gallery_data = gallery_resp.get_json()
         assert gallery_data["active"]["filename"] == filename
@@ -574,6 +599,31 @@ class TestDisplay:
         assert r > 100
         assert g > 100
         assert b > 100
+
+    def test_display_applies_rotation_before_scaling(self, client, gallery_dir, mock_display):
+        """A 90-degree rotation changes the fit footprint before palette preparation."""
+        img = Image.new("RGBA", (20, 10), (255, 0, 0, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "rotate.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 255, 255))
+            resp = client.post(
+                f"/display/{filename}",
+                json={"background": "000000", "scale_mode": "fit", "rotation": 90},
+            )
+
+        assert resp.status_code == 200
+        call_img = mock_prepare.call_args[0][0]
+        assert call_img.getpixel((300, 10)) == (255, 0, 0)
+        assert call_img.getpixel((10, 200)) == (0, 0, 0)
 
 
 # ===================================================================

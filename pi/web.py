@@ -31,6 +31,7 @@ DEFAULT_RENDER_SETTINGS: dict[str, Any] = {
     "crop_x": 0,
     "crop_y": 0,
     "scale": 1.0,
+    "rotation": 0,
     "brightness": 0,
     "contrast": 0,
     "saturation": 0,
@@ -210,6 +211,7 @@ def create_app(
             "crop_x",
             "crop_y",
             "scale",
+            "rotation",
             "brightness",
             "contrast",
             "saturation",
@@ -228,6 +230,7 @@ def create_app(
             settings["crop_x"] = int(settings["crop_x"])
             settings["crop_y"] = int(settings["crop_y"])
             settings["scale"] = float(settings["scale"])
+            settings["rotation"] = int(settings["rotation"])
             settings["brightness"] = int(settings["brightness"])
             settings["contrast"] = int(settings["contrast"])
             settings["saturation"] = int(settings["saturation"])
@@ -235,6 +238,7 @@ def create_app(
             return None, "Invalid numeric render setting"
 
         settings["scale"] = max(0.1, min(settings["scale"], 8.0))
+        settings["rotation"] = round(settings["rotation"] / 90) * 90 % 360
         settings["brightness"] = max(-100, min(settings["brightness"], 100))
         settings["contrast"] = max(-100, min(settings["contrast"], 100))
         settings["saturation"] = max(-100, min(settings["saturation"], 100))
@@ -263,6 +267,9 @@ def create_app(
         """Compose an uploaded image onto the 600x400 display canvas."""
         bg_rgb = _parse_bg_color(settings["background"])
         rgba = img.convert("RGBA")
+        rotation = int(settings.get("rotation", 0)) % 360
+        if rotation:
+            rgba = rgba.rotate(-rotation, expand=True)
         mode = settings["scale_mode"]
         zoom = float(settings.get("scale", 1.0))
         canvas = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), bg_rgb + (255,))

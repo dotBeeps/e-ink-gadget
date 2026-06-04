@@ -278,6 +278,10 @@
             <div class="field-line"><label for="zoom">Zoom</label><span class="value-label" id="zoom-label">1.00×</span></div>
             <input type="range" id="zoom" min="0.1" max="8" step="0.05" value="1">
           </div>
+          <div class="field full">
+            <div class="field-line"><label for="rotation">Rotation</label><span class="value-label" id="rotation-label">0°</span></div>
+            <input type="range" id="rotation" min="0" max="270" step="90" value="0">
+          </div>
           <div class="field">
             <label for="crop-x">Crop X</label>
             <input type="number" id="crop-x" value="0" step="1">
@@ -341,6 +345,7 @@
     crop_x: 0,
     crop_y: 0,
     scale: 1,
+    rotation: 0,
     brightness: 0,
     contrast: 0,
     saturation: 0,
@@ -366,6 +371,7 @@
     scaleMode: document.getElementById('scale-mode'),
     background: document.getElementById('background-color'),
     zoom: document.getElementById('zoom'),
+    rotation: document.getElementById('rotation'),
     cropX: document.getElementById('crop-x'),
     cropY: document.getElementById('crop-y'),
     brightness: document.getElementById('brightness'),
@@ -373,6 +379,7 @@
     saturation: document.getElementById('saturation'),
     backgroundLabel: document.getElementById('background-label'),
     zoomLabel: document.getElementById('zoom-label'),
+    rotationLabel: document.getElementById('rotation-label'),
     brightnessLabel: document.getElementById('brightness-label'),
     contrastLabel: document.getElementById('contrast-label'),
     saturationLabel: document.getElementById('saturation-label'),
@@ -433,6 +440,7 @@
       crop_x: parseInt(el.cropX.value || '0', 10),
       crop_y: parseInt(el.cropY.value || '0', 10),
       scale: parseFloat(el.zoom.value || '1'),
+      rotation: parseInt(el.rotation.value || '0', 10),
       brightness: parseInt(el.brightness.value || '0', 10),
       contrast: parseInt(el.contrast.value || '0', 10),
       saturation: parseInt(el.saturation.value || '0', 10),
@@ -444,6 +452,7 @@
     el.scaleMode.value = merged.scale_mode;
     el.background.value = '#' + merged.background;
     el.zoom.value = merged.scale;
+    el.rotation.value = merged.rotation;
     el.cropX.value = merged.crop_x;
     el.cropY.value = merged.crop_y;
     el.brightness.value = merged.brightness;
@@ -454,6 +463,7 @@
   function updateValueLabels() {
     el.backgroundLabel.textContent = el.background.value;
     el.zoomLabel.textContent = Number(el.zoom.value).toFixed(2) + '×';
+    el.rotationLabel.textContent = el.rotation.value + '°';
     el.brightnessLabel.textContent = el.brightness.value;
     el.contrastLabel.textContent = el.contrast.value;
     el.saturationLabel.textContent = el.saturation.value;
@@ -588,6 +598,23 @@
     ctx.fillText('No image selected', el.canvas.width / 2, el.canvas.height / 2);
   }
 
+  function drawRotatedImage(img, x, y, w, h, rotation) {
+    const angle = ((rotation % 360) + 360) % 360;
+    if (angle === 0) {
+      ctx.drawImage(img, x, y, w, h);
+      return;
+    }
+    ctx.save();
+    ctx.translate(x + w / 2, y + h / 2);
+    ctx.rotate(angle * Math.PI / 180);
+    if (angle === 90 || angle === 270) {
+      ctx.drawImage(img, -h / 2, -w / 2, h, w);
+    } else {
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    }
+    ctx.restore();
+  }
+
   function renderPreview() {
     updateValueLabels();
     const token = ++state.previewToken;
@@ -602,6 +629,9 @@
     img.onload = function() {
       if (token !== state.previewToken) return;
       const settings = currentSettings();
+      const rotated = settings.rotation === 90 || settings.rotation === 270;
+      const sourceWidth = rotated ? img.height : img.width;
+      const sourceHeight = rotated ? img.width : img.height;
       let w, h;
       if (settings.scale_mode === 'stretch') {
         w = el.canvas.width * settings.scale;
@@ -609,17 +639,17 @@
       } else {
         let factor = settings.scale;
         if (settings.scale_mode === 'fit' || settings.scale_mode === 'fill') {
-          const sx = el.canvas.width / img.width;
-          const sy = el.canvas.height / img.height;
+          const sx = el.canvas.width / sourceWidth;
+          const sy = el.canvas.height / sourceHeight;
           factor *= settings.scale_mode === 'fit' ? Math.min(sx, sy) : Math.max(sx, sy);
         }
-        w = img.width * factor;
-        h = img.height * factor;
+        w = sourceWidth * factor;
+        h = sourceHeight * factor;
       }
       const x = (el.canvas.width - w) / 2 + settings.crop_x;
       const y = (el.canvas.height - h) / 2 + settings.crop_y;
       ctx.filter = 'brightness(' + (100 + settings.brightness) + '%) contrast(' + (100 + settings.contrast) + '%) saturate(' + (100 + settings.saturation) + '%)';
-      ctx.drawImage(img, x, y, w, h);
+      drawRotatedImage(img, x, y, w, h, settings.rotation);
       ctx.filter = 'none';
     };
     img.onerror = clearPreview;
@@ -738,7 +768,7 @@
     }
   }
 
-  [el.scaleMode, el.background, el.zoom, el.cropX, el.cropY, el.brightness, el.contrast, el.saturation].forEach(input => {
+  [el.scaleMode, el.background, el.zoom, el.rotation, el.cropX, el.cropY, el.brightness, el.contrast, el.saturation].forEach(input => {
     input.addEventListener('input', renderPreview);
     input.addEventListener('change', renderPreview);
   });
