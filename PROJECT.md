@@ -84,11 +84,14 @@ tests/
 # Run all tests (80 tests)
 make test
 
-# Deploy to Pi
-make deploy-rpi PI_HOST=raspberrypi.local
+# Run on the Pi after cloning/pulling locally
+make install-code APP_DIR=/opt/e-ink-gadget
+make install-service APP_DIR=/opt/e-ink-gadget
 
-# Install systemd service on Pi
-make install-service PI_HOST=raspberrypi.local
+# Service helpers on the Pi
+make restart
+make status
+make logs
 
 # Clean artifacts
 make clean
