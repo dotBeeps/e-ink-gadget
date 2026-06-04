@@ -55,7 +55,7 @@ tests/
 ├── test_eink_driver.py  # 14 tests
 ├── test_display_daemon.py # 13 tests
 ├── test_vendor_driver_config.py # 6 tests
-└── test_web.py          # 35 Flask web API + home-editor UI tests
+└── test_web.py          # 36 Flask web API + home-editor UI tests
 ```
 
 ## Invariants
@@ -84,7 +84,7 @@ tests/
 ## Commands
 
 ```bash
-# Run all tests (121 tests)
+# Run all tests (122 tests)
 make test
 
 # Run mocked local web UI smoke server

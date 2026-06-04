@@ -156,6 +156,16 @@ class TestStatus:
         assert b'id="btn-display-selected"' in resp.data
         assert b"tab-btn" not in resp.data
 
+    def test_redisplay_active_preserves_current_render_tool_values(self, client):
+        """Redisplay Active should submit current controls, not restore saved settings first."""
+        resp = client.get("/", headers={"Accept": "text/html"})
+        html = resp.get_data(as_text=True)
+        match = re.search(r"async function redisplayActive\(\) \{(?P<body>.*?)\n  \}", html, re.S)
+        assert match is not None
+        body = match.group("body")
+        assert "applySettings(state.active.settings)" not in body
+        assert "await displaySelected();" in body
+
 
 # ===================================================================
 # TestPing

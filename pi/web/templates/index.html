@@ -662,7 +662,9 @@
       return;
     }
     state.selected = activeImage;
-    if (state.active.settings) applySettings(state.active.settings);
+    renderGallery();
+    renderActiveMeta();
+    renderPreview();
     await displaySelected();
   }
 
