@@ -138,6 +138,10 @@ class TestStatus:
         assert data["active"] is None
         assert "gallery_count" in data
 
+    def test_upload_size_limit_configured(self, app):
+        """The web app caps upload bodies before decoding images."""
+        assert app.config["MAX_CONTENT_LENGTH"] == 16 * 1024 * 1024
+
     def test_root_returns_html(self, client):
         """GET / with Accept: text/html returns HTML."""
         resp = client.get("/", headers={"Accept": "text/html"})
@@ -457,6 +461,58 @@ class TestDisplay:
         """Displaying a non-existent file returns 404."""
         resp = client.post("/display/nonexistent.png")
         assert resp.status_code == 404
+
+    def test_display_accepts_non_png_gallery_image(self, client, gallery_dir, mock_display):
+        """Display accepts Pillow-readable gallery images, not only PNG files."""
+        path = os.path.join(gallery_dir, "manual.jpg")
+        Image.new("RGB", (20, 20), (0, 255, 0)).save(path, "JPEG")
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 255, 255))
+            resp = client.post("/display/manual.jpg")
+
+        assert resp.status_code == 200
+        assert resp.get_json()["displayed"] == "manual.jpg"
+        mock_display.display_image.assert_called_once()
+
+    def test_display_unreadable_gallery_file_returns_sanitized_400(self, client, gallery_dir):
+        """Unreadable in-gallery files return a safe client error without paths."""
+        path = os.path.join(gallery_dir, "not-an-image.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("not image data")
+
+        resp = client.post("/display/not-an-image.txt")
+
+        assert resp.status_code == 400
+        error = resp.get_json()["error"]
+        assert error == "Invalid or unreadable image file"
+        assert gallery_dir not in error
+
+    def test_display_hardware_error_returns_sanitized_500(self, client, gallery_dir, mock_display):
+        """Display failures do not leak raw exception text or local paths."""
+        img = Image.new("RGBA", (10, 10), (255, 0, 0, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "display-error.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+        mock_display.display_image.side_effect = RuntimeError(
+            f"exploded while reading {gallery_dir}/secret.png"
+        )
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 0, 0))
+            resp = client.post(f"/display/{filename}")
+
+        assert resp.status_code == 500
+        error = resp.get_json()["error"]
+        assert error == "Display failed"
+        assert gallery_dir not in error
+        assert "secret" not in error
 
     def test_display_path_traversal_blocked(self, client):
         """Path traversal attempts are blocked."""

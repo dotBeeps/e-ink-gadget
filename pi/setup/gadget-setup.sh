@@ -259,14 +259,14 @@ fi
 ok "Pip packages installed"
 
 # ── 10. Create gallery directory ─────────────────────────────────────────
-GALLERY_DIR=/home/pi/eink-gadget/gallery
+GALLERY_DIR=/var/lib/e-ink-gadget/gallery
 if [[ ! -d "${GALLERY_DIR}" ]]; then
     mkdir -p "${GALLERY_DIR}"
-    chown pi:pi "${GALLERY_DIR}" 2>/dev/null || true
-    ok "Created ${GALLERY_DIR} and set owner to pi:pi"
+    chmod 0755 "${GALLERY_DIR}" 2>/dev/null || true
+    ok "Created ${GALLERY_DIR}"
 else
     ok "Gallery directory ${GALLERY_DIR} already exists"
-    chown pi:pi "${GALLERY_DIR}" 2>/dev/null || true
+    chmod 0755 "${GALLERY_DIR}" 2>/dev/null || true
 fi
 
 # ── 11. Done ──────────────────────────────────────────────────────────────

@@ -49,11 +49,13 @@ def send_frame(ser: Serial, cmd: int, payload: bytes = b"") -> None:
     frame = MAGIC + bytes([cmd]) + length.to_bytes(3, "big") + payload
     ser.write(frame)
 
-    # Read 6-byte response
+    # Read 6-byte response. Anything other than a complete ACK is a failed
+    # transfer: callers should not print "Sent ..." and exit 0 when the device
+    # timed out, disconnected, or returned garbage.
     resp = ser.read(6)
     if len(resp) < 6:
-        print("Warning: short response from device", file=sys.stderr)
-        return
+        print("error: short response from device", file=sys.stderr)
+        sys.exit(1)
 
     if resp[0] == RESP_ACK_PREFIX:
         return  # success
@@ -64,7 +66,8 @@ def send_frame(ser: Serial, cmd: int, payload: bytes = b"") -> None:
         print(f"Device error: {name}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Warning: unexpected response byte: {resp[0]:#04x}", file=sys.stderr)
+    print(f"error: unexpected response byte: {resp[0]:#04x}", file=sys.stderr)
+    sys.exit(1)
 
 
 def send_image(ser: Serial, image_path: str) -> None:

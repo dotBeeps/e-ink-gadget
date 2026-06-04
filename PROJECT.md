@@ -42,8 +42,9 @@ pi/
 └── setup/
     ├── gadget-setup.sh   # Full one-shot RPi 4 configfs setup (serial+ethernet + packages)
     ├── gadget-usb.sh     # Boot-time USB gadget configfs setup (no packages, minimal)
-    ├── eink-gadget.service         # systemd unit for display daemon
-    └── eink-gadget-setup.service   # systemd unit for boot-time USB gadget setup
+    ├── eink-gadget.env.example     # Default systemd environment file
+    ├── eink-gadget.service.in      # systemd unit template for display daemon
+    └── eink-gadget-setup.service.in # systemd unit template for boot-time USB gadget setup
 
 host/
 ├── eink_send.py         # CLI tool: send images to display over USB serial
@@ -53,9 +54,11 @@ tests/
 ├── test_protocol.py     # 28 tests
 ├── test_renderer.py     # 25 tests
 ├── test_eink_driver.py  # 14 tests
-├── test_display_daemon.py # 13 tests
+├── test_display_daemon.py # 16 tests
+├── test_host_eink_send.py # 4 host CLI tests
+├── test_install_units.py # 2 install/unit rendering tests
 ├── test_vendor_driver_config.py # 6 tests
-└── test_web.py          # 38 Flask web API + home-editor UI tests
+└── test_web.py          # 42 Flask web API + home-editor UI tests
 ```
 
 ## Invariants
@@ -79,12 +82,12 @@ tests/
   values one at a time, especially `EINK_SPI_HZ=16000000`.
 - Gadget USB: configfs dual function — acm.usb1 (serial) + ecm.usb0 (ethernet)
 - Gadget IP: 192.168.7.2, web UI accessible at http://192.168.7.2:8080
-- Gallery storage: /home/pi/eink-gadget/gallery/
+- Gallery storage: /var/lib/e-ink-gadget/gallery/
 
 ## Commands
 
 ```bash
-# Run all tests (124 tests)
+# Run all tests (137 tests)
 make test
 
 # Run mocked local web UI smoke server
@@ -114,7 +117,7 @@ make clean
 | configfs dual function (serial + ethernet) | 2026-06-02 | Settled |
 | Flask web UI runs in same process (daemon thread) | 2026-06-02 | Settled |
 | Alpha preserved at upload, bg composite at display time | 2026-06-02 | Settled |
-| Gallery storage: /home/pi/eink-gadget/gallery/ | 2026-06-02 | Settled |
+| Gallery storage: /var/lib/e-ink-gadget/gallery/ | 2026-06-04 | Settled |
 | Web UI layout: current-display editor with bottom gallery strip | 2026-06-03 | Settled |
 
 ## Next Step

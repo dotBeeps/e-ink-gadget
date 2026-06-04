@@ -6,13 +6,17 @@ Requires=eink-gadget-setup.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/e-ink-gadget
+WorkingDirectory=@APP_DIR@
+Environment=EINK_SERIAL_DEVICE=/dev/ttyGS0
+Environment=EINK_BAUD=921600
+Environment=EINK_GALLERY_DIR=/var/lib/e-ink-gadget/gallery
 Environment=EINK_SPI_HZ=4000000
 Environment=EINK_RESET_SETTLE_MS=20
 Environment=EINK_BOOSTER_DELAY_MS=200
 Environment=EINK_BUSY_POLL_MS=5
 Environment=EINK_BUSY_TIMEOUT_MS=90000
-ExecStart=/usr/bin/python3 -m pi.display_daemon --device /dev/ttyGS0 --baud 921600
+EnvironmentFile=-/etc/e-ink-gadget/eink-gadget.env
+ExecStart=/usr/bin/python3 -m pi.display_daemon --device ${EINK_SERIAL_DEVICE} --baud ${EINK_BAUD} --gallery-dir ${EINK_GALLERY_DIR}
 Restart=always
 RestartSec=10
 StandardOutput=journal

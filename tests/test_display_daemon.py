@@ -7,7 +7,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from pi.display_daemon import process_frame
+from pi.display_daemon import parse_args, process_frame
 from pi.eink_driver import DisplayError
 from pi.protocol import (
     CMD_CLEAR,
@@ -162,6 +162,18 @@ class TestProcessFrame(unittest.TestCase):
         self.assertEqual(response, Frame.error(ERROR_MALFORMED))
         self.mock_display.display_image.assert_not_called()
 
+    def test_image_unknown_format_returns_error(self):
+        """IMAGE frame with an unsupported pixel format returns malformed."""
+        # width=4, height=4, fmt=2 with RGB-sized data should not be accepted
+        header = (4).to_bytes(2, "big") + (4).to_bytes(2, "big") + bytes([2])
+        payload = header + bytes([0xAA]) * (4 * 4 * 3)
+        frame = Frame(cmd=CMD_IMAGE, payload=payload)
+
+        response = process_frame(frame, self.mock_display)
+
+        self.assertEqual(response, Frame.error(ERROR_MALFORMED))
+        self.mock_display.display_image.assert_not_called()
+
     @patch("pi.display_daemon.prepare_image")
     def test_image_display_error_returns_error(self, mock_prepare):
         """DisplayError during image display should return an ERROR response."""
@@ -195,6 +207,34 @@ class TestProcessFrame(unittest.TestCase):
         response = process_frame(frame, self.mock_display)
         self.assertEqual(response, Frame.error(ERROR_UNKNOWN_CMD))
         self.mock_display.assert_not_called()
+
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
+
+class TestCliArgs(unittest.TestCase):
+    """Tests for display_daemon's command-line contract."""
+
+    def test_parse_args_defaults_match_service_defaults(self):
+        args = parse_args([])
+        self.assertEqual(args.device, "/dev/ttyGS0")
+        self.assertEqual(args.baud, 921600)
+        self.assertEqual(args.gallery_dir, "/var/lib/e-ink-gadget/gallery")
+
+    def test_parse_args_accepts_service_arguments(self):
+        args = parse_args(
+            [
+                "--device",
+                "/dev/custom",
+                "--baud",
+                "115200",
+                "--gallery-dir",
+                "/tmp/gallery",
+            ]
+        )
+        self.assertEqual(args.device, "/dev/custom")
+        self.assertEqual(args.baud, 115200)
+        self.assertEqual(args.gallery_dir, "/tmp/gallery")
 
 
 if __name__ == "__main__":

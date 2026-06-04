@@ -7,6 +7,7 @@ Spectra 6 display driver, and returns ACK/ERROR responses.
 
 from __future__ import annotations
 
+import argparse
 import logging
 import threading
 
@@ -97,12 +98,15 @@ def _process_image(frame: Frame, display: EInkDisplay) -> bytes:
 
     raw_pixels = payload[_IMAGE_HEADER_SIZE:]
 
-    if fmt == _FMT_RGBA:
+    if fmt == _FMT_RGB:
+        expected = width * height * 3
+        mode = "RGB"
+    elif fmt == _FMT_RGBA:
         expected = width * height * 4
         mode = "RGBA"
     else:
-        expected = width * height * 3
-        mode = "RGB"
+        logger.warning("IMAGE has unsupported pixel format: %d", fmt)
+        return Frame.error(ERROR_MALFORMED)
 
     if len(raw_pixels) != expected:
         logger.warning(
@@ -157,12 +161,14 @@ def _process_frame_with_lock(
 def run_daemon(
     serial_device: str = "/dev/ttyGS0",
     baud: int = 921600,
+    gallery_dir: str = "/var/lib/e-ink-gadget/gallery",
 ) -> None:
     """Run the display daemon main loop.
 
     Args:
         serial_device: Serial device path (USB gadget).
         baud: Baud rate for the serial connection.
+        gallery_dir: Directory for uploaded gallery images and display state.
     """
     import serial  # noqa: PLC0415
 
@@ -177,7 +183,7 @@ def run_daemon(
     app = create_app(
         display=display,
         display_lock=display_lock,
-        gallery_dir="/home/pi/eink-gadget/gallery",
+        gallery_dir=gallery_dir,
     )
     flask_thread = threading.Thread(
         target=app.run,
@@ -234,9 +240,46 @@ def run_daemon(
                     logger.exception("Serial write error")
 
 
+# ── CLI ──────────────────────────────────────────────────────────────────────
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse daemon command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Run the e-ink USB gadget display daemon.",
+    )
+    parser.add_argument(
+        "--device",
+        default="/dev/ttyGS0",
+        help="Serial gadget device path (default: /dev/ttyGS0)",
+    )
+    parser.add_argument(
+        "--baud",
+        type=int,
+        default=921600,
+        help="Serial baud rate (default: 921600)",
+    )
+    parser.add_argument(
+        "--gallery-dir",
+        default="/var/lib/e-ink-gadget/gallery",
+        help="Gallery/state directory (default: /var/lib/e-ink-gadget/gallery)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    """CLI entry point."""
+    args = parse_args(argv)
+    run_daemon(
+        serial_device=args.device,
+        baud=args.baud,
+        gallery_dir=args.gallery_dir,
+    )
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
-    run_daemon()
+    main()

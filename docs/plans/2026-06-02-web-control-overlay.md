@@ -171,7 +171,7 @@ fi
 ok "Pip packages installed"
 
 # ── Create gallery directory ──────────────────────────────────────────────
-GALLERY_DIR=/home/pi/eink-gadget/gallery
+GALLERY_DIR=/var/lib/e-ink-gadget/gallery
 mkdir -p "$GALLERY_DIR"
 chown pi:pi "$GALLERY_DIR" 2>/dev/null || true
 ok "Gallery directory: $GALLERY_DIR"
@@ -241,7 +241,7 @@ Replace the `run_daemon` function with:
 def run_daemon(
     serial_device: str = "/dev/ttyGS0",
     serial_baud: int = 921600,
-    gallery_dir: str = "/home/pi/eink-gadget/gallery",
+    gallery_dir: str = "/var/lib/e-ink-gadget/gallery",
 ) -> None:
     """Run the display daemon: serial reader + Flask web server."""
     import serial  # noqa: PLC0415
@@ -575,7 +575,7 @@ def create_app(
     *,
     display: Any,
     display_lock: Any,
-    gallery_dir: str = "/home/pi/eink-gadget/gallery",
+    gallery_dir: str = "/var/lib/e-ink-gadget/gallery",
 ) -> Flask:
     """Create the Flask application with all routes."""
     app = Flask(__name__)
@@ -1111,7 +1111,7 @@ Host Computer                    RPi 4 (USB gadget)                    E-Ink Dis
 - Display access is serialized via threading.Lock() (serial + web share one display)
 - Gadget uses configfs with dual functions: acm.usb1 (serial) + ecm.usb0 (ethernet)
 - Gadget IP: 192.168.7.2, accessible via http://192.168.7.2:8080
-- Gallery stored at /home/pi/eink-gadget/gallery/
+- Gallery stored at /var/lib/e-ink-gadget/gallery/
 
 ## Decisions
 
@@ -1121,7 +1121,7 @@ Host Computer                    RPi 4 (USB gadget)                    E-Ink Dis
 | configfs dual function (serial + ethernet) | 2026-06-02 | Settled |
 | Flask web UI in same process | 2026-06-02 | Settled |
 | Alpha preserved at upload, bg at display time | 2026-06-02 | Settled |
-| Gallery storage: /home/pi/eink-gadget/gallery/ | 2026-06-02 | Settled |
+| Gallery storage: /var/lib/e-ink-gadget/gallery/ | 2026-06-02 | Settled |
 ```
 
 **Step: Commit**

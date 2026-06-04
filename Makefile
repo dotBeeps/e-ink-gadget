@@ -1,6 +1,8 @@
 # ── Variables ──────────────────────────────────────────────────────────────
 # This Makefile is intended to be run locally on the Raspberry Pi.
 APP_DIR ?= /opt/e-ink-gadget
+ETC_DIR ?= /etc/e-ink-gadget
+STATE_DIR ?= /var/lib/e-ink-gadget
 PYTHON  ?= python3
 SUDO    ?= sudo
 
@@ -19,6 +21,7 @@ help:
 # ── Local install ──────────────────────────────────────────────────────────
 .PHONY: install-code
 install-code:
+	@case "$(APP_DIR)" in /*) ;; *) printf 'APP_DIR must be absolute: %s\n' "$(APP_DIR)" >&2; exit 2;; esac
 	@if [ "$$(pwd -P)" = "$$(cd "$(APP_DIR)" 2>/dev/null && pwd -P)" ]; then \
 		printf 'Already running from %s; skipping code copy\n' "$(APP_DIR)"; \
 	else \
@@ -40,9 +43,21 @@ deploy-rpi: install-code
 # ── Install service ───────────────────────────────────────────────────────
 .PHONY: install-service
 install-service: install-code
-	$(SUDO) install -m 0644 "$(APP_DIR)/pi/setup/eink-gadget.service" /etc/systemd/system/eink-gadget.service
-	$(SUDO) install -m 0644 "$(APP_DIR)/pi/setup/eink-gadget-setup.service" /etc/systemd/system/eink-gadget-setup.service
+	@case "$(APP_DIR)" in /*) ;; *) printf 'APP_DIR must be absolute: %s\n' "$(APP_DIR)" >&2; exit 2;; esac
+	$(SUDO) install -d -m 0755 "$(ETC_DIR)" "$(STATE_DIR)/gallery"
+	@if [ ! -f "$(ETC_DIR)/eink-gadget.env" ]; then \
+		$(SUDO) install -m 0644 "$(APP_DIR)/pi/setup/eink-gadget.env.example" "$(ETC_DIR)/eink-gadget.env"; \
+		printf 'Installed default %s\n' "$(ETC_DIR)/eink-gadget.env"; \
+	else \
+		printf 'Preserving existing %s\n' "$(ETC_DIR)/eink-gadget.env"; \
+	fi
 	$(SUDO) chmod 0755 "$(APP_DIR)/pi/setup/gadget-usb.sh"
+	@tmpdir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	$(PYTHON) "$(APP_DIR)/tools/render_systemd_units.py" --app-dir "$(APP_DIR)" --template-dir "$(APP_DIR)/pi/setup" --output-dir "$$tmpdir" >/dev/null; \
+	if command -v systemd-analyze >/dev/null 2>&1; then systemd-analyze verify "$$tmpdir"/*.service; fi; \
+	$(SUDO) install -m 0644 "$$tmpdir/eink-gadget.service" /etc/systemd/system/eink-gadget.service; \
+	$(SUDO) install -m 0644 "$$tmpdir/eink-gadget-setup.service" /etc/systemd/system/eink-gadget-setup.service
 	$(SUDO) systemctl daemon-reload
 	$(SUDO) systemctl enable --now eink-gadget-setup
 	$(SUDO) systemctl enable --now eink-gadget

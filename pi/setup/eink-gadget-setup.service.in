@@ -6,7 +6,7 @@ Wants=local-fs.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /home/pi/eink-gadget/pi/setup/gadget-usb.sh
+ExecStart=/bin/bash @APP_DIR@/pi/setup/gadget-usb.sh
 
 [Install]
 WantedBy=multi-user.target

@@ -16,7 +16,7 @@ from threading import Lock
 from typing import Any, Optional
 
 from flask import Flask, jsonify, render_template, request, send_file
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, UnidentifiedImageError
 
 from pi.renderer import prepare_image
 
@@ -45,7 +45,7 @@ def create_app(
     *,
     display,
     display_lock: Lock,
-    gallery_dir: str = "/home/pi/eink-gadget/gallery",
+    gallery_dir: str = "/var/lib/e-ink-gadget/gallery",
 ) -> Flask:
     """Create and configure the Flask application.
 
@@ -59,6 +59,11 @@ def create_app(
         A configured Flask application instance.
     """
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "web", "templates"))
+    # The gadget is a local appliance UI, but bound to the USB network. Keep
+    # accidental or hostile giant uploads from consuming unbounded RAM/CPU before
+    # Pillow can thumbnail them down to the display canvas.
+    if app.config.get("MAX_CONTENT_LENGTH") is None:
+        app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
     app.config["gallery_dir"] = gallery_dir
     app.config["display"] = display
     app.config["display_lock"] = display_lock
@@ -386,7 +391,11 @@ def create_app(
             return jsonify({"error": settings_error}), 400
 
         try:
-            img = Image.open(real_path).convert("RGBA")
+            try:
+                img = Image.open(real_path).convert("RGBA")
+            except (UnidentifiedImageError, OSError):
+                return jsonify({"error": "Invalid or unreadable image file"}), 400
+
             composite = _compose_for_display(img, settings)
             composite = _apply_color_adjustments(composite, settings)
             prepared = prepare_image(composite)
@@ -404,8 +413,8 @@ def create_app(
                     "active": _load_display_state(),
                 }
             )
-        except Exception as exc:
-            return jsonify({"error": f"Display failed: {exc}"}), 500
+        except Exception:
+            return jsonify({"error": "Display failed"}), 500
 
     @app.route("/image/<path:filename>", methods=["GET"])
     def serve_image(filename: str):
