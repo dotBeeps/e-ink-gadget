@@ -7,6 +7,11 @@ Requires=eink-gadget-setup.service
 Type=simple
 User=root
 WorkingDirectory=/opt/e-ink-gadget
+Environment=EINK_SPI_HZ=4000000
+Environment=EINK_RESET_SETTLE_MS=20
+Environment=EINK_BOOSTER_DELAY_MS=200
+Environment=EINK_BUSY_POLL_MS=5
+Environment=EINK_BUSY_TIMEOUT_MS=90000
 ExecStart=/usr/bin/python3 -m pi.display_daemon --device /dev/ttyGS0 --baud 921600
 Restart=always
 RestartSec=10

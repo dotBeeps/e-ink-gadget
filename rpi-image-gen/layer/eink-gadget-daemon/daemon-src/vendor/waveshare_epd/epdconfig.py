@@ -38,6 +38,28 @@ from ctypes import *
 logger = logging.getLogger(__name__)
 
 
+def _env_int(name: str, default: int, minimum: int = 1) -> int:
+    """Read a positive integer setting from the environment."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("Invalid %s=%r; using default %d", name, raw, default)
+        return default
+    if value < minimum:
+        logger.warning(
+            "Invalid %s=%r; value must be >= %d; using default %d",
+            name,
+            raw,
+            minimum,
+            default,
+        )
+        return default
+    return value
+
+
 class RaspberryPi:
     # Pin definition
     RST_PIN  = 17
@@ -141,11 +163,10 @@ class RaspberryPi:
         else:
             # SPI device, bus = 0, device = 0
             self.SPI.open(0, 0)
-            # Waveshare's stock driver uses 4 MHz for broad compatibility.
-            # The Pi 4B hardware SPI path and this panel tolerate a higher
-            # transfer clock; 16 MHz cuts the 120 KiB frame upload from
-            # ~240 ms to ~60 ms while staying conservative for the HAT+ wiring.
-            self.SPI.max_speed_hz = 16000000
+            # Default to Waveshare's conservative 4 MHz for first hardware
+            # bring-up. Set EINK_SPI_HZ=16000000 after baseline verification
+            # to cut the 120 KiB frame upload from ~240 ms to ~60 ms.
+            self.SPI.max_speed_hz = _env_int("EINK_SPI_HZ", 4000000)
             self.SPI.mode = 0b00
         return 0
 

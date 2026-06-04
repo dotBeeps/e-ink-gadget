@@ -69,6 +69,11 @@ tests/
 - Gallery images stored as RGBA PNGs at ≤600×400 with transparency preserved
 - Background color compositing happens at display time (via ?bg=RRGGBB), not upload time
 - Display access serialized via threading.Lock() (serial loop + web routes share one display)
+- Driver timing defaults are conservative for first hardware bring-up:
+  `EINK_SPI_HZ=4000000`, `EINK_RESET_SETTLE_MS=20`,
+  `EINK_BOOSTER_DELAY_MS=200`, `EINK_BUSY_POLL_MS=5`,
+  `EINK_BUSY_TIMEOUT_MS=90000`. After baseline verification, test faster
+  values one at a time, especially `EINK_SPI_HZ=16000000`.
 - Gadget USB: configfs dual function — acm.usb1 (serial) + ecm.usb0 (ethernet)
 - Gadget IP: 192.168.7.2, web UI accessible at http://192.168.7.2:8080
 - Gallery storage: /home/pi/eink-gadget/gallery/

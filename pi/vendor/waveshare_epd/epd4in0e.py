@@ -29,6 +29,7 @@
 #
 
 import logging
+import os
 from . import epdconfig
 
 import PIL
@@ -40,6 +41,28 @@ EPD_WIDTH       = 400
 EPD_HEIGHT      = 600
 
 logger = logging.getLogger(__name__)
+
+
+def _env_int(name: str, default: int, minimum: int = 0) -> int:
+    """Read a bounded integer timing setting from the environment."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("Invalid %s=%r; using default %d", name, raw, default)
+        return default
+    if value < minimum:
+        logger.warning(
+            "Invalid %s=%r; value must be >= %d; using default %d",
+            name,
+            raw,
+            minimum,
+            default,
+        )
+        return default
+    return value
 
 class EPD:
     def __init__(self):
@@ -60,11 +83,11 @@ class EPD:
     # Hardware reset
     def reset(self):
         epdconfig.digital_write(self.reset_pin, 1)
-        epdconfig.delay_ms(5)
+        epdconfig.delay_ms(_env_int("EINK_RESET_SETTLE_MS", 20))
         epdconfig.digital_write(self.reset_pin, 0)         # module reset
         epdconfig.delay_ms(2)
         epdconfig.digital_write(self.reset_pin, 1)
-        epdconfig.delay_ms(5)
+        epdconfig.delay_ms(_env_int("EINK_RESET_SETTLE_MS", 20))
 
     def send_command(self, command):
         epdconfig.digital_write(self.dc_pin, 0)
@@ -87,8 +110,16 @@ class EPD:
         
     def ReadBusyH(self):
         logger.debug("e-Paper busy H")
+        poll_ms = _env_int("EINK_BUSY_POLL_MS", 5, minimum=1)
+        timeout_ms = _env_int("EINK_BUSY_TIMEOUT_MS", 90000, minimum=0)
+        waited_ms = 0
         while(epdconfig.digital_read(self.busy_pin) == 0):      # 0: busy, 1: idle
-            epdconfig.delay_ms(1)
+            if timeout_ms and waited_ms >= timeout_ms:
+                raise RuntimeError(
+                    "e-Paper BUSY timeout after %d ms" % waited_ms
+                )
+            epdconfig.delay_ms(poll_ms)
+            waited_ms += poll_ms
         epdconfig.delay_ms(200)
         logger.debug("e-Paper busy H release")
 
@@ -101,9 +132,9 @@ class EPD:
         self.send_data(0x1F)
         self.send_data(0x17)
         self.send_data(0x27)
-        # The following display-refresh command waits on BUSY immediately after
-        # it is issued. Avoid the stock fixed 200 ms booster delay here; the
-        # readiness gate is the controller's BUSY line, not wall-clock padding.
+        booster_delay_ms = _env_int("EINK_BOOSTER_DELAY_MS", 200)
+        if booster_delay_ms:
+            epdconfig.delay_ms(booster_delay_ms)
 
         self.send_command(0x12) # DISPLAY_REFRESH
         self.send_data(0X00)
