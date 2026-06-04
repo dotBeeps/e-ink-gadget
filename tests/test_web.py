@@ -127,6 +127,14 @@ class TestStatus:
         data = resp.get_json()
         assert data["status"] == "ok"
         assert data["display"] == "connected"
+        assert data["display_width"] == 600
+        assert data["display_height"] == 400
+        assert data["refresh_seconds"] == 19
+        assert data["palette"] == ["black", "white", "yellow", "red", "blue", "green"]
+        assert data["scale_modes"] == ["fill", "fit", "original", "stretch"]
+        assert data["default_settings"]["background"] == "ffffff"
+        assert data["default_settings"]["scale_mode"] == "fit"
+        assert data["active"] is None
         assert "gallery_count" in data
 
     def test_root_returns_html(self, client):
@@ -135,6 +143,18 @@ class TestStatus:
         assert resp.status_code == 200
         assert resp.mimetype == "text/html"
         assert b"e-ink Gadget" in resp.data
+        assert b"Current Display" in resp.data
+        assert b"Render Tools" in resp.data
+        assert b"gallery-strip" in resp.data
+        assert b'id="preview-canvas" width="600" height="400"' in resp.data
+        assert b'id="scale-mode"' in resp.data
+        assert b'id="crop-x"' in resp.data
+        assert b'id="crop-y"' in resp.data
+        assert b'id="brightness"' in resp.data
+        assert b'id="contrast"' in resp.data
+        assert b'id="saturation"' in resp.data
+        assert b'id="btn-display-selected"' in resp.data
+        assert b"tab-btn" not in resp.data
 
 
 # ===================================================================
@@ -271,7 +291,7 @@ class TestGallery:
         resp = client.get("/gallery")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data == {"images": []}
+        assert data == {"images": [], "active": None}
 
     def test_gallery_lists_images(self, client, gallery_dir):
         """Gallery lists uploaded images with correct metadata."""
@@ -295,6 +315,7 @@ class TestGallery:
         assert resp.status_code == 200
         data = resp.get_json()
         assert len(data["images"]) == 2
+        assert data["active"] is None
 
         # Check all required fields present
         for img_info in data["images"]:
@@ -302,6 +323,9 @@ class TestGallery:
             assert "url" in img_info
             assert "size_bytes" in img_info
             assert "modified" in img_info
+            assert "width" in img_info
+            assert "height" in img_info
+            assert "active" in img_info
             assert img_info["url"].startswith("/image/")
             assert img_info["name"].endswith(".png")
 
@@ -329,7 +353,7 @@ class TestGallery:
             f.write("hello")
 
         resp = client.get("/gallery")
-        assert resp.get_json() == {"images": []}
+        assert resp.get_json() == {"images": [], "active": None}
 
 
 # ===================================================================
@@ -445,6 +469,102 @@ class TestDisplay:
             assert display_lock.acquire_count >= 1
             assert display_lock.release_count >= 1
 
+    def test_display_saves_active_state(self, client, gallery_dir, mock_display):
+        """POST /display/<filename> records the active image and settings."""
+        img = Image.new("RGBA", (20, 20), (100, 100, 100, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "state.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 255, 255))
+            resp = client.post(
+                f"/display/{filename}",
+                json={"background": "000000", "scale_mode": "fill", "scale": 1.25},
+            )
+
+        assert resp.status_code == 200
+        active = resp.get_json()["active"]
+        assert active["filename"] == filename
+        assert active["settings"]["background"] == "000000"
+        assert active["settings"]["scale_mode"] == "fill"
+        assert active["settings"]["scale"] == 1.25
+
+        gallery_resp = client.get("/gallery")
+        gallery_data = gallery_resp.get_json()
+        assert gallery_data["active"]["filename"] == filename
+        assert gallery_data["images"][0]["active"] is True
+
+    def test_display_rejects_invalid_scale_mode(self, client, gallery_dir):
+        """Invalid scale mode returns 400."""
+        img = Image.new("RGBA", (10, 10), (255, 0, 0, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "bad-mode.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+
+        resp = client.post(f"/display/{filename}", json={"scale_mode": "sideways"})
+        assert resp.status_code == 400
+        assert "Invalid scale mode" in resp.get_json()["error"]
+
+    def test_display_scale_modes_compose_600x400(self, client, gallery_dir, mock_display):
+        """All scale modes pass a 600x400 RGB composite to prepare_image."""
+        for mode in ("fit", "fill", "stretch", "original"):
+            img = Image.new("RGBA", (120, 80), (0, 0, 255, 180))
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            buf.seek(0)
+            resp = client.post(
+                "/upload",
+                data={"file": (buf, f"{mode}.png")},
+                content_type="multipart/form-data",
+            )
+            filename = resp.get_json()["filename"]
+
+            with patch("pi.web.prepare_image") as mock_prepare:
+                mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 255, 255))
+                resp = client.post(f"/display/{filename}", json={"scale_mode": mode})
+
+            assert resp.status_code == 200
+            call_img = mock_prepare.call_args[0][0]
+            assert call_img.mode == "RGB"
+            assert call_img.size == (600, 400)
+
+    def test_display_applies_brightness_adjustment(self, client, gallery_dir, mock_display):
+        """Brightness setting affects the image before palette preparation."""
+        img = Image.new("RGBA", (600, 400), (100, 100, 100, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "bright.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 255, 255))
+            resp = client.post(f"/display/{filename}", json={"brightness": 50})
+
+        assert resp.status_code == 200
+        call_img = mock_prepare.call_args[0][0]
+        r, g, b = call_img.getpixel((300, 200))
+        assert r > 100
+        assert g > 100
+        assert b > 100
+
 
 # ===================================================================
 # TestClear
@@ -456,7 +576,7 @@ class TestClear:
         """POST /clear calls display.clear()."""
         resp = client.post("/clear")
         assert resp.status_code == 200
-        assert resp.get_json() == {"status": "ok"}
+        assert resp.get_json() == {"status": "ok", "active": None}
         mock_display.clear.assert_called_once()
 
     def test_clear_uses_lock(self, client, mock_display, display_lock):
@@ -465,6 +585,30 @@ class TestClear:
         assert resp.status_code == 200
         assert display_lock.acquire_count >= 1
         assert display_lock.release_count >= 1
+
+    def test_clear_removes_active_state(self, client, gallery_dir, mock_display):
+        """Clearing the display removes the durable active image state."""
+        img = Image.new("RGBA", (10, 10), (255, 0, 0, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "clear-active.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 0, 0))
+            display_resp = client.post(f"/display/{filename}")
+        assert display_resp.status_code == 200
+        assert client.get("/gallery").get_json()["active"]["filename"] == filename
+
+        clear_resp = client.post("/clear")
+        assert clear_resp.status_code == 200
+        assert clear_resp.get_json()["active"] is None
+        assert client.get("/gallery").get_json()["active"] is None
 
 
 # ===================================================================
@@ -491,12 +635,36 @@ class TestDelete:
         resp = client.delete(f"/image/{filename}")
         assert resp.status_code == 200
         assert resp.get_json()["deleted"] == filename
+        assert resp.get_json()["active"] is None
         assert not os.path.isfile(filepath)
 
     def test_delete_not_found(self, client):
         """DELETE /image/<filename> on missing file returns 404."""
         resp = client.delete("/image/nonexistent.png")
         assert resp.status_code == 404
+
+    def test_delete_active_image_clears_active_state(self, client, gallery_dir):
+        """Deleting the active image clears durable display state."""
+        img = Image.new("RGBA", (10, 10), (255, 0, 0, 255))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        buf.seek(0)
+        resp = client.post(
+            "/upload",
+            data={"file": (buf, "active-delete.png")},
+            content_type="multipart/form-data",
+        )
+        filename = resp.get_json()["filename"]
+
+        with patch("pi.web.prepare_image") as mock_prepare:
+            mock_prepare.return_value = Image.new("RGB", (600, 400), (255, 0, 0))
+            display_resp = client.post(f"/display/{filename}")
+        assert display_resp.status_code == 200
+
+        resp = client.delete(f"/image/{filename}")
+        assert resp.status_code == 200
+        assert resp.get_json()["active"] is None
+        assert client.get("/gallery").get_json()["active"] is None
 
     def test_delete_path_traversal_blocked(self, client):
         """Path traversal attempts are blocked."""

@@ -5,622 +5,756 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>e-ink Gadget</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    color-scheme: dark;
+    --bg: #151515;
+    --panel: #232323;
+    --panel-2: #2b2b2b;
+    --text: #eeeeee;
+    --muted: #a3a3a3;
+    --line: #3e3e3e;
+    --blue: #3b82f6;
+    --green: #16a34a;
+    --red: #dc2626;
+    --yellow-bg: #3a3214;
+    --yellow-text: #fde68a;
+  }
   body {
-    background: #1a1a1a;
-    color: #e0e0e0;
-    font-family: system-ui, -apple-system, sans-serif;
-    padding: 1rem;
-    max-width: 640px;
-    margin: 0 auto;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
     min-height: 100vh;
-  }
-  h1 { font-size: 1.5rem; margin-bottom: 1rem; }
-
-  /* Tabs */
-  .tabs {
-    display: flex;
-    gap: 0;
-    border-bottom: 2px solid #333;
-    margin-bottom: 1.25rem;
-  }
-  .tab-btn {
-    flex: 1;
-    padding: 0.6rem 0;
-    background: transparent;
-    border: none;
-    color: #888;
-    font-size: 0.95rem;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .tab-btn:hover { color: #ccc; }
-  .tab-btn.active {
-    color: #fff;
-    border-bottom-color: #4a9eff;
-  }
-
-  /* Tab panes */
-  .tab-pane { display: none; }
-  .tab-pane.active { display: block; }
-
-  /* Cards / sections */
-  .card {
-    background: #242424;
-    border-radius: 8px;
     padding: 1rem;
+  }
+  .app-shell { max-width: 1100px; margin: 0 auto; }
+  .app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
     margin-bottom: 1rem;
   }
-  .card-title {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #999;
-    margin-bottom: 0.75rem;
-  }
-
-  /* Form elements */
-  label { display: block; font-size: 0.85rem; color: #bbb; margin-bottom: 0.3rem; }
-  input[type="file"] {
-    display: block;
-    width: 100%;
-    padding: 0.5rem;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #e0e0e0;
-    font-size: 0.9rem;
-    margin-bottom: 0.75rem;
-  }
-  input[type="file"]::file-selector-button {
-    background: #333;
-    border: 1px solid #555;
-    border-radius: 3px;
-    color: #e0e0e0;
-    padding: 0.25rem 0.6rem;
-    cursor: pointer;
-    margin-right: 0.5rem;
-  }
-  input[type="color"] {
-    display: block;
-    width: 100%;
-    height: 2.5rem;
-    padding: 0.2rem;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-bottom: 0.75rem;
-  }
-  .color-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-  .color-row label { margin-bottom: 0; white-space: nowrap; }
-  .color-row input[type="color"] { flex: 1; margin-bottom: 0; }
-  .color-row .hex-label {
-    font-family: monospace;
-    font-size: 0.85rem;
-    color: #999;
-    min-width: 4.5rem;
-  }
-
-  .btn {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: background 0.15s;
-    color: #fff;
-  }
-  .btn-primary { background: #2563eb; }
-  .btn-primary:hover { background: #1d4ed8; }
-  .btn-success { background: #16a34a; }
-  .btn-success:hover { background: #15803d; }
-  .btn-danger { background: #dc2626; }
-  .btn-danger:hover { background: #b91c1c; }
-  .btn-secondary { background: #555; }
-  .btn-secondary:hover { background: #666; }
-  .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
-  .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-
-  /* Canvas preview */
-  .canvas-wrap {
-    text-align: center;
-    margin-top: 0.75rem;
-  }
-  .canvas-wrap canvas {
-    border: 1px solid #444;
-    border-radius: 4px;
-    image-rendering: pixelated;
-    max-width: 100%;
-  }
-
-  /* Status indicator */
-  .status-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
-  .status-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    background: #555;
-    flex-shrink: 0;
-  }
-  .status-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
-  .status-dot.offline { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
-  .status-dot.checking { background: #facc15; animation: pulse 1s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-  .status-text { font-size: 0.85rem; color: #aaa; }
-
-  /* Gallery grid */
-  .gallery-grid {
+  h1, h2, h3, p { margin-top: 0; }
+  h1 { font-size: 1.6rem; margin-bottom: 0.15rem; }
+  h2 { font-size: 1rem; margin-bottom: 0; }
+  h3 { font-size: 0.9rem; margin-bottom: 0.5rem; color: #d8d8d8; }
+  .subtitle, .active-meta, .hint { color: var(--muted); font-size: 0.85rem; line-height: 1.35; }
+  .layout-shell {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.85fr);
+    gap: 1rem;
+  }
+  .preview-panel, .tools-panel, .upload-panel, .gallery-strip-panel, .status-panel {
+    background: var(--panel);
+    border: 1px solid #2f2f2f;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  }
+  .preview-panel { min-width: 0; }
+  .side-stack { display: grid; gap: 1rem; align-content: start; }
+  .gallery-strip-panel { grid-column: 1 / -1; }
+  .section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .active-badge {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 0.2rem 0.55rem;
+    white-space: nowrap;
+  }
+  .active-badge.live { border-color: #15803d; color: #86efac; background: #14532d; }
+  .display-frame {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    background: #0f0f0f;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .display-frame canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 6px;
+    background: #fff;
+  }
+  label { display: block; color: #cfcfcf; font-size: 0.82rem; margin-bottom: 0.25rem; }
+  input, select {
+    width: 100%;
+    background: #171717;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 0.45rem 0.5rem;
+    font: inherit;
+  }
+  input[type="color"] { height: 2.35rem; padding: 0.2rem; }
+  input[type="range"] { padding-left: 0; padding-right: 0; }
+  input[type="file"]::file-selector-button {
+    background: #343434;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: var(--text);
+    padding: 0.25rem 0.55rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+  }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .field { min-width: 0; }
+  .field.full { grid-column: 1 / -1; }
+  .field-line { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
+  .value-label { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; }
+  .btn {
+    border: 0;
+    border-radius: 7px;
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font: inherit;
+    min-height: 2.25rem;
+    padding: 0.5rem 0.8rem;
+  }
+  .btn:disabled { cursor: wait; opacity: 0.55; }
+  .btn-primary { background: #2563eb; }
+  .btn-success { background: var(--green); }
+  .btn-danger { background: var(--red); }
+  .btn-secondary { background: #555; }
+  .btn-sm { min-height: 1.8rem; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+  .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.8rem; }
+  .refresh-note {
+    border-left: 3px solid #facc15;
+    background: var(--yellow-bg);
+    color: var(--yellow-text);
+    padding: 0.5rem 0.65rem;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    margin-bottom: 0.85rem;
+  }
+  .msg {
+    display: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    margin-top: 0.75rem;
+    padding: 0.55rem 0.7rem;
+  }
+  .msg.info { display: block; background: #1e3a5f; color: #bfdbfe; }
+  .msg.success { display: block; background: #14532d; color: #bbf7d0; }
+  .msg.error { display: block; background: #5c1a1a; color: #fecaca; }
+  .gallery-strip {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding: 0.25rem 0.15rem 0.65rem;
+    scroll-snap-type: x proximity;
   }
   .gallery-card {
-    background: #2a2a2a;
-    border-radius: 6px;
-    padding: 0.5rem;
-    text-align: center;
+    background: var(--panel-2);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    flex: 0 0 150px;
+    padding: 0.45rem;
+    scroll-snap-align: start;
+    text-align: left;
   }
+  .gallery-card:hover { border-color: #555; }
+  .gallery-card.selected { border-color: var(--blue); }
+  .gallery-card.active { box-shadow: 0 0 0 2px #22c55e88; }
   .gallery-card img {
     width: 100%;
-    aspect-ratio: 3/2;
-    object-fit: cover;
-    border-radius: 3px;
-    background: #333;
+    aspect-ratio: 3 / 2;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #111;
     display: block;
     margin-bottom: 0.4rem;
   }
   .gallery-card .filename {
-    font-size: 0.75rem;
-    color: #aaa;
-    word-break: break-all;
-    margin-bottom: 0.4rem;
+    color: #d0d0d0;
+    font-size: 0.74rem;
     line-height: 1.2;
+    margin-bottom: 0.25rem;
+    overflow-wrap: anywhere;
   }
-  .gallery-card .btn-group { justify-content: center; }
-
-  /* Message area */
-  .msg {
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    margin-bottom: 0.75rem;
-    display: none;
+  .gallery-meta { color: #7f8794; font-size: 0.7rem; margin-bottom: 0.35rem; }
+  .card-actions { display: flex; justify-content: space-between; gap: 0.35rem; }
+  .empty-state {
+    border: 1px dashed #555;
+    border-radius: 10px;
+    color: var(--muted);
+    min-width: 260px;
+    padding: 1rem;
+    text-align: center;
   }
-  .msg.info { display: block; background: #1e3a5f; color: #93c5fd; }
-  .msg.success { display: block; background: #14532d; color: #86efac; }
-  .msg.error { display: block; background: #5c1a1a; color: #fca5a5; }
-  .msg.hidden { display: none; }
-
-  /* Loading spinner */
-  .spinner {
+  .status-dot {
     display: inline-block;
-    width: 1rem; height: 1rem;
-    border: 2px solid #555;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    background: #555;
+    margin-right: 0.35rem;
+  }
+  .status-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+  .status-dot.offline { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
+  .status-dot.checking { background: #facc15; }
+  .spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #ffffff66;
     border-top-color: #fff;
     border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-    vertical-align: middle;
-    margin-right: 0.3rem;
+    animation: spin 0.7s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 820px) {
+    body { padding: 0.75rem; }
+    .layout-shell { grid-template-columns: 1fr; }
+    .field-grid { grid-template-columns: 1fr; }
+    .field.full { grid-column: auto; }
+    .app-header { align-items: stretch; flex-direction: column; }
+  }
 </style>
 </head>
 <body>
+<div class="app-shell">
+  <header class="app-header">
+    <div>
+      <h1>⏺ e-ink Gadget</h1>
+      <p class="subtitle">600×400 Spectra 6 display composer</p>
+    </div>
+    <div class="status-panel" aria-live="polite">
+      <p class="subtitle" id="status-text"><span id="status-dot" class="status-dot checking"></span>Checking device…</p>
+      <button class="btn btn-secondary btn-sm" id="btn-ping">Ping</button>
+    </div>
+  </header>
 
-<h1>⏺ e-ink Gadget</h1>
+  <main class="layout-shell">
+    <section class="preview-panel" aria-labelledby="preview-title">
+      <div class="section-heading">
+        <h2 id="preview-title">Current Display</h2>
+        <span class="active-badge" id="active-badge">No active image</span>
+      </div>
+      <div class="display-frame" aria-label="600 by 400 display preview">
+        <canvas id="preview-canvas" width="600" height="400"></canvas>
+      </div>
+      <p class="active-meta" id="active-meta">Select an image from the gallery strip or upload a new one.</p>
+      <div id="main-msg" class="msg"></div>
+    </section>
 
-<!-- Tabs -->
-<div class="tabs">
-  <button class="tab-btn active" data-tab="upload">Upload</button>
-  <button class="tab-btn" data-tab="gallery">Gallery</button>
-  <button class="tab-btn" data-tab="control">Control</button>
-</div>
+    <div class="side-stack">
+      <section class="tools-panel" aria-labelledby="tools-title">
+        <h2 id="tools-title">Render Tools</h2>
+        <p class="refresh-note">Display and clear operations trigger a full Spectra 6 refresh and can take about 19 seconds.</p>
+        <div class="field-grid">
+          <div class="field full">
+            <label for="scale-mode">Scale mode</label>
+            <select id="scale-mode">
+              <option value="fit">Fit</option>
+              <option value="fill">Fill / crop</option>
+              <option value="stretch">Stretch</option>
+              <option value="original">Original size</option>
+            </select>
+          </div>
+          <div class="field full">
+            <div class="field-line"><label for="background-color">Background</label><span class="value-label" id="background-label">#ffffff</span></div>
+            <input type="color" id="background-color" value="#ffffff">
+          </div>
+          <div class="field full">
+            <div class="field-line"><label for="zoom">Zoom</label><span class="value-label" id="zoom-label">1.00×</span></div>
+            <input type="range" id="zoom" min="0.1" max="8" step="0.05" value="1">
+          </div>
+          <div class="field">
+            <label for="crop-x">Crop X</label>
+            <input type="number" id="crop-x" value="0" step="1">
+          </div>
+          <div class="field">
+            <label for="crop-y">Crop Y</label>
+            <input type="number" id="crop-y" value="0" step="1">
+          </div>
+          <div class="field full">
+            <div class="field-line"><label for="brightness">Brightness</label><span class="value-label" id="brightness-label">0</span></div>
+            <input type="range" id="brightness" min="-100" max="100" value="0">
+          </div>
+          <div class="field full">
+            <div class="field-line"><label for="contrast">Contrast</label><span class="value-label" id="contrast-label">0</span></div>
+            <input type="range" id="contrast" min="-100" max="100" value="0">
+          </div>
+          <div class="field full">
+            <div class="field-line"><label for="saturation">Saturation</label><span class="value-label" id="saturation-label">0</span></div>
+            <input type="range" id="saturation" min="-100" max="100" value="0">
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-success" id="btn-display-selected">Display Selected</button>
+          <button class="btn btn-secondary" id="btn-redisplay-active">Redisplay Active</button>
+          <button class="btn btn-danger" id="btn-clear">Clear</button>
+        </div>
+      </section>
 
-<!-- ======================== Upload Tab ======================== -->
-<div id="tab-upload" class="tab-pane active">
-  <div class="card">
-    <div class="card-title">Upload Image</div>
-    <div id="upload-msg" class="msg"></div>
-
-    <div class="color-row">
-      <label for="upload-bg">Background</label>
-      <input type="color" id="upload-bg" value="#ffffff">
-      <span class="hex-label" id="upload-hex">#ffffff</span>
+      <section class="upload-panel" aria-labelledby="upload-title">
+        <h2 id="upload-title">Upload</h2>
+        <p class="hint">Uploads are stored as PNGs with alpha preserved. The selected background is applied only when displaying.</p>
+        <label for="file-input">Choose image</label>
+        <input type="file" id="file-input" accept="image/*">
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-upload">Upload</button>
+          <button class="btn btn-success" id="btn-upload-display">Upload + Display</button>
+        </div>
+        <div id="upload-msg" class="msg"></div>
+      </section>
     </div>
 
-    <label for="file-input">Choose image</label>
-    <input type="file" id="file-input" accept="image/*">
-
-    <div class="btn-group">
-      <button class="btn btn-primary" id="btn-upload">Upload</button>
-      <button class="btn btn-success" id="btn-upload-display">Upload &amp; Display</button>
-    </div>
-
-    <div class="canvas-wrap">
-      <canvas id="preview-canvas" width="120" height="80"></canvas>
-    </div>
-  </div>
-</div>
-
-<!-- ======================== Gallery Tab ======================== -->
-<div id="tab-gallery" class="tab-pane">
-  <div class="card">
-    <div class="card-title">Gallery</div>
-    <div id="gallery-msg" class="msg"></div>
-
-    <div class="color-row">
-      <label for="gallery-bg">Background</label>
-      <input type="color" id="gallery-bg" value="#ffffff">
-      <span class="hex-label" id="gallery-hex">#ffffff</span>
-    </div>
-
-    <div class="btn-group" style="margin-bottom:0.75rem">
-      <button class="btn btn-secondary" id="btn-refresh">Refresh</button>
-    </div>
-
-    <div id="gallery-grid" class="gallery-grid">
-      <p style="color:#666;font-size:0.85rem;grid-column:1/-1">No images. Upload one from the Upload tab.</p>
-    </div>
-  </div>
-</div>
-
-<!-- ======================== Control Tab ======================== -->
-<div id="tab-control" class="tab-pane">
-  <div class="card">
-    <div class="card-title">Device Status</div>
-    <div class="status-row">
-      <span class="status-dot checking" id="status-dot"></span>
-      <span class="status-text" id="status-text">Checking&hellip;</span>
-    </div>
-    <div id="control-msg" class="msg"></div>
-
-    <div class="btn-group">
-      <button class="btn btn-danger" id="btn-clear">Clear Display</button>
-      <button class="btn btn-secondary" id="btn-ping">Ping</button>
-    </div>
-  </div>
+    <section class="gallery-strip-panel" aria-labelledby="gallery-title">
+      <div class="section-heading">
+        <h2 id="gallery-title">Gallery</h2>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh">Refresh</button>
+      </div>
+      <div id="gallery-strip" class="gallery-strip" aria-label="Uploaded images">
+        <div class="empty-state">Loading gallery…</div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
 (function() {
   'use strict';
 
-  /* ── Helpers ── */
-  function showMsg(el, text, type) {
-    el.className = 'msg ' + type;
-    el.textContent = text;
-  }
-  function hideMsg(el) {
-    el.className = 'msg hidden';
-    el.textContent = '';
-  }
-  function bgHex(input) {
-    return input.value.replace('#', '');
-  }
-
-  /* ── Tab Switching ── */
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const panes = {
-    upload: document.getElementById('tab-upload'),
-    gallery: document.getElementById('tab-gallery'),
-    control: document.getElementById('tab-control'),
+  const DEFAULT_SETTINGS = {
+    background: 'ffffff',
+    scale_mode: 'fit',
+    crop_x: 0,
+    crop_y: 0,
+    scale: 1,
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+  };
+  const state = {
+    images: [],
+    active: null,
+    selected: null,
+    settings: Object.assign({}, DEFAULT_SETTINGS),
+    previewToken: 0,
   };
 
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', function() {
-      tabBtns.forEach(b => b.classList.remove('active'));
-      Object.values(panes).forEach(p => p.classList.remove('active'));
-      this.classList.add('active');
-      const tab = this.dataset.tab;
-      panes[tab].classList.add('active');
+  const el = {
+    statusText: document.getElementById('status-text'),
+    statusDot: document.getElementById('status-dot'),
+    activeBadge: document.getElementById('active-badge'),
+    activeMeta: document.getElementById('active-meta'),
+    mainMsg: document.getElementById('main-msg'),
+    uploadMsg: document.getElementById('upload-msg'),
+    canvas: document.getElementById('preview-canvas'),
+    galleryStrip: document.getElementById('gallery-strip'),
+    fileInput: document.getElementById('file-input'),
+    scaleMode: document.getElementById('scale-mode'),
+    background: document.getElementById('background-color'),
+    zoom: document.getElementById('zoom'),
+    cropX: document.getElementById('crop-x'),
+    cropY: document.getElementById('crop-y'),
+    brightness: document.getElementById('brightness'),
+    contrast: document.getElementById('contrast'),
+    saturation: document.getElementById('saturation'),
+    backgroundLabel: document.getElementById('background-label'),
+    zoomLabel: document.getElementById('zoom-label'),
+    brightnessLabel: document.getElementById('brightness-label'),
+    contrastLabel: document.getElementById('contrast-label'),
+    saturationLabel: document.getElementById('saturation-label'),
+    btnDisplaySelected: document.getElementById('btn-display-selected'),
+    btnRedisplayActive: document.getElementById('btn-redisplay-active'),
+    btnClear: document.getElementById('btn-clear'),
+    btnPing: document.getElementById('btn-ping'),
+    btnRefresh: document.getElementById('btn-refresh'),
+    btnUpload: document.getElementById('btn-upload'),
+    btnUploadDisplay: document.getElementById('btn-upload-display'),
+  };
+  const ctx = el.canvas.getContext('2d');
 
-      // Auto-load data
-      if (tab === 'gallery') loadGallery();
-      if (tab === 'control') checkStatus();
-    });
-  });
-
-  /* ── Color pickers ── */
-  const uploadBg = document.getElementById('upload-bg');
-  const uploadHex = document.getElementById('upload-hex');
-  uploadBg.addEventListener('input', () => {
-    uploadHex.textContent = uploadBg.value;
-    renderPreview();
-  });
-
-  const galleryBg = document.getElementById('gallery-bg');
-  const galleryHex = document.getElementById('gallery-hex');
-  galleryBg.addEventListener('input', () => {
-    galleryHex.textContent = galleryBg.value;
-  });
-
-  /* ── Canvas Preview (Upload tab) ── */
-  const fileInput = document.getElementById('file-input');
-  const canvas = document.getElementById('preview-canvas');
-  const ctx = canvas.getContext('2d');
-
-  fileInput.addEventListener('change', renderPreview);
-
-  function renderPreview() {
-    const file = fileInput.files && fileInput.files[0];
-    const bgColor = uploadBg.value;
-
-    // Fill background
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (!file) return;
-
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      img.onload = function() {
-        // Scale to fit canvas maintaining aspect ratio
-        const scale = Math.min(
-          canvas.width / img.width,
-          canvas.height / img.height,
-          1
-        );
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const x = Math.round((canvas.width - w) / 2);
-        const y = Math.round((canvas.height - h) / 2);
-
-        // Re-fill background (in case colour changed since read)
-        ctx.fillStyle = uploadBg.value;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, x, y, w, h);
-      };
-      img.src = e.target.result;
+  function showMsg(target, text, type) {
+    target.className = 'msg ' + type;
+    target.textContent = text;
+  }
+  function hideMsg(target) {
+    target.className = 'msg';
+    target.textContent = '';
+  }
+  function setBusy(button, busy, label) {
+    if (!button.dataset.idleText) button.dataset.idleText = button.textContent;
+    button.disabled = busy;
+    button.replaceChildren();
+    if (busy) {
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      button.appendChild(spinner);
+      button.appendChild(document.createTextNode(label));
+    } else {
+      button.textContent = button.dataset.idleText;
+    }
+  }
+  function emptyState(text) {
+    const node = document.createElement('div');
+    node.className = 'empty-state';
+    node.textContent = text;
+    return node;
+  }
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes)) return '';
+    if (bytes < 1024) return bytes + ' B';
+    return Math.round(bytes / 1024) + ' KB';
+  }
+  function formatDate(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function imageByName(name) {
+    return state.images.find(img => img.name === name) || null;
+  }
+  function currentSettings() {
+    return {
+      background: el.background.value.replace('#', '').toLowerCase(),
+      scale_mode: el.scaleMode.value,
+      crop_x: parseInt(el.cropX.value || '0', 10),
+      crop_y: parseInt(el.cropY.value || '0', 10),
+      scale: parseFloat(el.zoom.value || '1'),
+      brightness: parseInt(el.brightness.value || '0', 10),
+      contrast: parseInt(el.contrast.value || '0', 10),
+      saturation: parseInt(el.saturation.value || '0', 10),
     };
-    reader.readAsDataURL(file);
+  }
+  function applySettings(settings) {
+    const merged = Object.assign({}, DEFAULT_SETTINGS, settings || {});
+    state.settings = merged;
+    el.scaleMode.value = merged.scale_mode;
+    el.background.value = '#' + merged.background;
+    el.zoom.value = merged.scale;
+    el.cropX.value = merged.crop_x;
+    el.cropY.value = merged.crop_y;
+    el.brightness.value = merged.brightness;
+    el.contrast.value = merged.contrast;
+    el.saturation.value = merged.saturation;
+    updateValueLabels();
+  }
+  function updateValueLabels() {
+    el.backgroundLabel.textContent = el.background.value;
+    el.zoomLabel.textContent = Number(el.zoom.value).toFixed(2) + '×';
+    el.brightnessLabel.textContent = el.brightness.value;
+    el.contrastLabel.textContent = el.contrast.value;
+    el.saturationLabel.textContent = el.saturation.value;
+  }
+  function setStatus(kind, text) {
+    el.statusDot.className = 'status-dot ' + kind;
+    el.statusText.replaceChildren(el.statusDot, document.createTextNode(text));
   }
 
-  /* ── Upload ── */
-  const btnUpload = document.getElementById('btn-upload');
-  const btnUploadDisplay = document.getElementById('btn-upload-display');
-  const uploadMsg = document.getElementById('upload-msg');
-
-  async function uploadFile() {
-    const file = fileInput.files && fileInput.files[0];
-    if (!file) {
-      showMsg(uploadMsg, 'Please select a file first.', 'error');
-      return null;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    hideMsg(uploadMsg);
-    btnUpload.disabled = true;
-    btnUpload.innerHTML = '<span class="spinner"></span>Uploading…';
-
+  async function loadStatus() {
+    setStatus('checking', 'Checking device…');
     try {
-      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const res = await fetch('/', { headers: { Accept: 'application/json' } });
       const data = await res.json();
-      if (!res.ok) {
-        showMsg(uploadMsg, data.error || 'Upload failed.', 'error');
-        return null;
-      }
-      showMsg(uploadMsg, 'Uploaded: ' + data.filename, 'success');
-      return data.filename;
+      if (!res.ok || data.status !== 'ok') throw new Error(data.error || 'unexpected response');
+      state.active = data.active || null;
+      if (data.default_settings && !state.active) applySettings(data.default_settings);
+      if (state.active && state.active.settings) applySettings(state.active.settings);
+      setStatus('online', 'Online · ' + (data.gallery_count || 0) + ' images');
     } catch (err) {
-      showMsg(uploadMsg, 'Network error: ' + err.message, 'error');
-      return null;
-    } finally {
-      btnUpload.disabled = false;
-      btnUpload.textContent = 'Upload';
+      setStatus('offline', 'Offline · ' + err.message);
     }
   }
-
-  btnUpload.addEventListener('click', uploadFile);
-
-  btnUploadDisplay.addEventListener('click', async function() {
-    const filename = await uploadFile();
-    if (!filename) return;
-
-    const bg = bgHex(uploadBg);
-    hideMsg(uploadMsg);
-    btnUploadDisplay.disabled = true;
-    btnUploadDisplay.innerHTML = '<span class="spinner"></span>Displaying…';
-
-    try {
-      const res = await fetch('/display/' + filename + '?bg=' + bg, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        showMsg(uploadMsg, data.error || 'Display failed.', 'error');
-      } else {
-        showMsg(uploadMsg, 'Uploaded and displayed on device.', 'success');
-      }
-    } catch (err) {
-      showMsg(uploadMsg, 'Network error: ' + err.message, 'error');
-    } finally {
-      btnUploadDisplay.disabled = false;
-      btnUploadDisplay.textContent = 'Upload & Display';
-    }
-  });
-
-  /* ── Gallery ── */
-  const galleryGrid = document.getElementById('gallery-grid');
-  const galleryMsg = document.getElementById('gallery-msg');
-  const btnRefresh = document.getElementById('btn-refresh');
 
   async function loadGallery() {
-    hideMsg(galleryMsg);
-    galleryGrid.innerHTML = '<p style="color:#666;font-size:0.85rem;grid-column:1/-1">Loading…</p>';
-
+    el.galleryStrip.replaceChildren(emptyState('Loading gallery…'));
     try {
       const res = await fetch('/gallery');
       const data = await res.json();
-      if (!res.ok) {
-        galleryGrid.innerHTML = '<p style="color:#fca5a5;font-size:0.85rem;grid-column:1/-1">Failed to load gallery.</p>';
-        return;
+      if (!res.ok) throw new Error(data.error || 'failed to load gallery');
+      state.images = data.images || [];
+      state.active = data.active || state.active || null;
+      if (!state.selected) {
+        state.selected = state.active ? imageByName(state.active.filename) : (state.images[0] || null);
       }
+      renderGallery();
+      renderActiveMeta();
+      renderPreview();
+    } catch (err) {
+      el.galleryStrip.replaceChildren(emptyState('Network error loading gallery.'));
+    }
+  }
 
-      const images = data.images || [];
-      if (images.length === 0) {
-        galleryGrid.innerHTML = '<p style="color:#666;font-size:0.85rem;grid-column:1/-1">No images. Upload one from the Upload tab.</p>';
-        return;
-      }
-
-      galleryGrid.innerHTML = '';
-      images.forEach(img => {
-        const card = document.createElement('div');
-        card.className = 'gallery-card';
-
-        const thumb = document.createElement('img');
-        thumb.src = img.url;
-        thumb.alt = img.name;
-        thumb.loading = 'lazy';
-
-        const nameEl = document.createElement('div');
-        nameEl.className = 'filename';
-        nameEl.textContent = img.name;
-
-        const btnGroup = document.createElement('div');
-        btnGroup.className = 'btn-group';
-
-        const displayBtn = document.createElement('button');
-        displayBtn.className = 'btn btn-success btn-sm';
-        displayBtn.textContent = 'Display';
-        displayBtn.addEventListener('click', function() {
-          displayFromGallery(img.name);
-        });
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn btn-danger btn-sm';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.addEventListener('click', function() {
-          deleteFromGallery(img.name);
-        });
-
-        btnGroup.appendChild(displayBtn);
-        btnGroup.appendChild(deleteBtn);
-        card.appendChild(thumb);
-        card.appendChild(nameEl);
-        card.appendChild(btnGroup);
-        galleryGrid.appendChild(card);
+  function renderGallery() {
+    el.galleryStrip.replaceChildren();
+    if (state.images.length === 0) {
+      el.galleryStrip.replaceChildren(emptyState('No images yet. Upload one to start composing.'));
+      return;
+    }
+    state.images.forEach(img => {
+      const card = document.createElement('article');
+      card.className = 'gallery-card';
+      if (state.selected && state.selected.name === img.name) card.classList.add('selected');
+      if (img.active || (state.active && state.active.filename === img.name)) card.classList.add('active');
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', 'Select ' + img.name);
+      card.addEventListener('click', () => selectImage(img.name));
+      card.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectImage(img.name); }
       });
-    } catch (err) {
-      galleryGrid.innerHTML = '<p style="color:#fca5a5;font-size:0.85rem;grid-column:1/-1">Network error loading gallery.</p>';
-    }
+
+      const thumb = document.createElement('img');
+      thumb.src = img.url;
+      thumb.alt = img.name;
+      thumb.loading = 'lazy';
+
+      const name = document.createElement('div');
+      name.className = 'filename';
+      name.textContent = img.name;
+
+      const meta = document.createElement('div');
+      meta.className = 'gallery-meta';
+      const dims = img.width && img.height ? img.width + '×' + img.height + ' · ' : '';
+      meta.textContent = dims + formatBytes(img.size_bytes) + ' · ' + formatDate(img.modified);
+
+      const actions = document.createElement('div');
+      actions.className = 'card-actions';
+      const displayBtn = document.createElement('button');
+      displayBtn.className = 'btn btn-success btn-sm';
+      displayBtn.textContent = 'Display';
+      displayBtn.addEventListener('click', e => { e.stopPropagation(); selectImage(img.name); displaySelected(); });
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn btn-danger btn-sm';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', e => { e.stopPropagation(); deleteImage(img.name); });
+      actions.appendChild(displayBtn);
+      actions.appendChild(deleteBtn);
+
+      card.appendChild(thumb);
+      card.appendChild(name);
+      card.appendChild(meta);
+      card.appendChild(actions);
+      el.galleryStrip.appendChild(card);
+    });
   }
 
-  async function displayFromGallery(name) {
-    const bg = bgHex(galleryBg);
-    hideMsg(galleryMsg);
-    showMsg(galleryMsg, 'Displaying ' + name + '…', 'info');
+  function selectImage(name) {
+    state.selected = imageByName(name);
+    if (state.active && state.active.filename === name && state.active.settings) {
+      applySettings(state.active.settings);
+    }
+    renderGallery();
+    renderActiveMeta();
+    renderPreview();
+  }
 
-    try {
-      const res = await fetch('/display/' + encodeURIComponent(name) + '?bg=' + bg, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        showMsg(galleryMsg, data.error || 'Display failed.', 'error');
+  function renderActiveMeta() {
+    if (state.active && state.active.filename) {
+      el.activeBadge.textContent = 'Active display';
+      el.activeBadge.className = 'active-badge live';
+    } else {
+      el.activeBadge.textContent = 'No active image';
+      el.activeBadge.className = 'active-badge';
+    }
+    if (!state.selected) {
+      el.activeMeta.textContent = 'Select an image from the gallery strip or upload a new one.';
+      return;
+    }
+    const selectedActive = state.active && state.active.filename === state.selected.name;
+    const prefix = selectedActive ? 'Active: ' : 'Selected: ';
+    const when = selectedActive && state.active.displayed_at ? ' · displayed ' + formatDate(state.active.displayed_at) : '';
+    el.activeMeta.textContent = prefix + state.selected.name + when;
+  }
+
+  function clearPreview() {
+    ctx.fillStyle = el.background.value;
+    ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
+    ctx.fillStyle = '#666';
+    ctx.font = '20px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No image selected', el.canvas.width / 2, el.canvas.height / 2);
+  }
+
+  function renderPreview() {
+    updateValueLabels();
+    const token = ++state.previewToken;
+    ctx.filter = 'none';
+    ctx.fillStyle = el.background.value;
+    ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
+    if (!state.selected) {
+      clearPreview();
+      return;
+    }
+    const img = new Image();
+    img.onload = function() {
+      if (token !== state.previewToken) return;
+      const settings = currentSettings();
+      let w, h;
+      if (settings.scale_mode === 'stretch') {
+        w = el.canvas.width * settings.scale;
+        h = el.canvas.height * settings.scale;
       } else {
-        showMsg(galleryMsg, 'Displayed: ' + name, 'success');
+        let factor = settings.scale;
+        if (settings.scale_mode === 'fit' || settings.scale_mode === 'fill') {
+          const sx = el.canvas.width / img.width;
+          const sy = el.canvas.height / img.height;
+          factor *= settings.scale_mode === 'fit' ? Math.min(sx, sy) : Math.max(sx, sy);
+        }
+        w = img.width * factor;
+        h = img.height * factor;
       }
-    } catch (err) {
-      showMsg(galleryMsg, 'Network error: ' + err.message, 'error');
-    }
+      const x = (el.canvas.width - w) / 2 + settings.crop_x;
+      const y = (el.canvas.height - h) / 2 + settings.crop_y;
+      ctx.filter = 'brightness(' + (100 + settings.brightness) + '%) contrast(' + (100 + settings.contrast) + '%) saturate(' + (100 + settings.saturation) + '%)';
+      ctx.drawImage(img, x, y, w, h);
+      ctx.filter = 'none';
+    };
+    img.onerror = clearPreview;
+    img.src = state.selected.url;
   }
 
-  async function deleteFromGallery(name) {
-    if (!confirm('Delete "' + name + '" permanently?')) return;
-    hideMsg(galleryMsg);
-
+  async function displaySelected() {
+    if (!state.selected) {
+      showMsg(el.mainMsg, 'Select an image first.', 'error');
+      return;
+    }
+    hideMsg(el.mainMsg);
+    setBusy(el.btnDisplaySelected, true, 'Displaying… this may take ~19s');
     try {
-      const res = await fetch('/image/' + encodeURIComponent(name), { method: 'DELETE' });
+      const res = await fetch('/display/' + encodeURIComponent(state.selected.name), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentSettings()),
+      });
       const data = await res.json();
-      if (!res.ok) {
-        showMsg(galleryMsg, data.error || 'Delete failed.', 'error');
-      } else {
-        showMsg(galleryMsg, 'Deleted: ' + name, 'success');
-        loadGallery();
-      }
+      if (!res.ok) throw new Error(data.error || 'display failed');
+      state.active = data.active || null;
+      await loadGallery();
+      showMsg(el.mainMsg, 'Displayed: ' + state.selected.name, 'success');
     } catch (err) {
-      showMsg(galleryMsg, 'Network error: ' + err.message, 'error');
+      showMsg(el.mainMsg, err.message, 'error');
+    } finally {
+      setBusy(el.btnDisplaySelected, false);
     }
   }
 
-  btnRefresh.addEventListener('click', loadGallery);
-
-  /* ── Control ── */
-  const statusDot = document.getElementById('status-dot');
-  const statusText = document.getElementById('status-text');
-  const controlMsg = document.getElementById('control-msg');
-  const btnClear = document.getElementById('btn-clear');
-  const btnPing = document.getElementById('btn-ping');
-
-  async function checkStatus() {
-    statusDot.className = 'status-dot checking';
-    statusText.textContent = 'Checking…';
-
-    try {
-      const res = await fetch('/');
-      const data = await res.json();
-      if (res.ok && data.status === 'ok') {
-        statusDot.className = 'status-dot online';
-        statusText.textContent = 'Online — ' + (data.gallery_count || 0) + ' images in gallery';
-      } else {
-        statusDot.className = 'status-dot offline';
-        statusText.textContent = 'Error: unexpected response';
-      }
-    } catch (err) {
-      statusDot.className = 'status-dot offline';
-      statusText.textContent = 'Offline — ' + err.message;
+  async function redisplayActive() {
+    if (!state.active) {
+      showMsg(el.mainMsg, 'No active image recorded yet.', 'error');
+      return;
     }
+    const activeImage = imageByName(state.active.filename);
+    if (!activeImage) {
+      showMsg(el.mainMsg, 'The active image is no longer in the gallery.', 'error');
+      return;
+    }
+    state.selected = activeImage;
+    if (state.active.settings) applySettings(state.active.settings);
+    await displaySelected();
   }
 
-  btnClear.addEventListener('click', async function() {
-    hideMsg(controlMsg);
-    showMsg(controlMsg, 'Clearing display…', 'info');
-    btnClear.disabled = true;
-
+  async function clearDisplay() {
+    hideMsg(el.mainMsg);
+    setBusy(el.btnClear, true, 'Clearing… this may take ~19s');
     try {
       const res = await fetch('/clear', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) {
-        showMsg(controlMsg, data.error || 'Clear failed.', 'error');
-      } else {
-        showMsg(controlMsg, 'Display cleared.', 'success');
-      }
+      if (!res.ok) throw new Error(data.error || 'clear failed');
+      state.active = null;
+      await loadGallery();
+      renderActiveMeta();
+      showMsg(el.mainMsg, 'Display cleared.', 'success');
     } catch (err) {
-      showMsg(controlMsg, 'Network error: ' + err.message, 'error');
+      showMsg(el.mainMsg, err.message, 'error');
     } finally {
-      btnClear.disabled = false;
+      setBusy(el.btnClear, false);
     }
-  });
+  }
 
-  btnPing.addEventListener('click', async function() {
-    hideMsg(controlMsg);
-    showMsg(controlMsg, 'Pinging…', 'info');
-
+  async function ping() {
     try {
+      setStatus('checking', 'Pinging…');
       const res = await fetch('/ping');
       const data = await res.json();
-      if (res.ok && data.status === 'ok') {
-        showMsg(controlMsg, 'Pong! Device is responsive.', 'success');
-      } else {
-        showMsg(controlMsg, 'Unexpected response.', 'error');
-      }
+      if (!res.ok || data.status !== 'ok') throw new Error('unexpected response');
+      setStatus('online', 'Online · pong');
     } catch (err) {
-      showMsg(controlMsg, 'Network error: ' + err.message, 'error');
+      setStatus('offline', 'Offline · ' + err.message);
     }
-  });
+  }
 
+  async function uploadFile(displayAfter) {
+    const file = el.fileInput.files && el.fileInput.files[0];
+    if (!file) {
+      showMsg(el.uploadMsg, 'Choose an image first.', 'error');
+      return;
+    }
+    hideMsg(el.uploadMsg);
+    setBusy(displayAfter ? el.btnUploadDisplay : el.btnUpload, true, displayAfter ? 'Uploading…' : 'Uploading…');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/upload', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'upload failed');
+      await loadGallery();
+      selectImage(data.filename);
+      showMsg(el.uploadMsg, 'Uploaded: ' + data.filename, 'success');
+      if (displayAfter) await displaySelected();
+      el.fileInput.value = '';
+    } catch (err) {
+      showMsg(el.uploadMsg, err.message, 'error');
+    } finally {
+      setBusy(displayAfter ? el.btnUploadDisplay : el.btnUpload, false);
+    }
+  }
+
+  async function deleteImage(name) {
+    if (!confirm('Delete "' + name + '" permanently?')) return;
+    try {
+      const res = await fetch('/image/' + encodeURIComponent(name), { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'delete failed');
+      if (state.selected && state.selected.name === name) state.selected = null;
+      await loadGallery();
+      showMsg(el.mainMsg, 'Deleted: ' + name, 'success');
+    } catch (err) {
+      showMsg(el.mainMsg, err.message, 'error');
+    }
+  }
+
+  [el.scaleMode, el.background, el.zoom, el.cropX, el.cropY, el.brightness, el.contrast, el.saturation].forEach(input => {
+    input.addEventListener('input', renderPreview);
+    input.addEventListener('change', renderPreview);
+  });
+  el.btnDisplaySelected.addEventListener('click', displaySelected);
+  el.btnRedisplayActive.addEventListener('click', redisplayActive);
+  el.btnClear.addEventListener('click', clearDisplay);
+  el.btnPing.addEventListener('click', ping);
+  el.btnRefresh.addEventListener('click', loadGallery);
+  el.btnUpload.addEventListener('click', () => uploadFile(false));
+  el.btnUploadDisplay.addEventListener('click', () => uploadFile(true));
+
+  async function boot() {
+    applySettings(DEFAULT_SETTINGS);
+    clearPreview();
+    await loadStatus();
+    await loadGallery();
+  }
+  boot();
 })();
 </script>
 </body>

@@ -3,7 +3,7 @@
 > E-Ink USB Gadget Display — turn a Raspberry Pi 4 + Waveshare 4-inch Spectra 6
 > e-Paper into a single-cable USB appliance display.
 
-**Status:** Phase 1-5 complete (code + tests + web overlay), awaiting hardware verification (Phase 6).
+**Status:** Phase 1-5 complete (code + tests + web home-editor UI), awaiting hardware verification (Phase 6).
 
 ## Architecture
 
@@ -17,8 +17,8 @@ Host Computer                    RPi 4 (USB gadget, configfs)          E-Ink Dis
                               │ ├─ Flask HTTP (:8080)    │  24,25   │              │
 ┌──────────────┐    USB-C     │ │   /upload (preserves   │           │              │
 │ web browser  │────────────►│ │   alpha, resizes)      │           │              │
-│ (any OS)     │  RNDIS ECM  │ │   /gallery (JSON/HTML) │           │              │
-│              │  usb0       │ │   /display/<name>?bg=   │           │              │
+│ (any OS)     │  RNDIS ECM  │ │   /gallery + active    │           │              │
+│              │  usb0       │ │   /display/<name>      │           │              │
 │              │  192.168.7.2│ │   /clear /ping /delete  │           │              │
 └──────────────┘              │ └─ display driver (lock) │           └──────────────┘
                               └─────────────────────────┘
@@ -35,7 +35,7 @@ pi/
 │                        #   + Flask web server (background thread)
 ├── web.py               # Flask REST API: upload, gallery, display, control
 │   └── templates/
-│       └── index.html   # Single-page web UI (Upload | Gallery | Control)
+│       └── index.html   # Single-page web UI (Current Display editor + gallery strip)
 ├── vendor/waveshare_epd/ # Vendored Waveshare Spectra 6 driver
 │   ├── epd4in0e.py      # EPD class: init, getbuffer, display, Clear, sleep
 │   └── epdconfig.py     # SPI/GPIO hardware abstraction (spidev + gpiozero)
@@ -53,7 +53,9 @@ tests/
 ├── test_protocol.py     # 28 tests
 ├── test_renderer.py     # 25 tests
 ├── test_eink_driver.py  # 14 tests
-└── test_display_daemon.py # 13 tests
+├── test_display_daemon.py # 13 tests
+├── test_vendor_driver_config.py # 6 tests
+└── test_web.py          # 35 Flask web API + home-editor UI tests
 ```
 
 ## Invariants
@@ -67,7 +69,8 @@ tests/
 - Image format: raw RGB24 sent over serial; PNG decompression happens on the Pi
 - Power: user handles (may need powered USB hub for RPi 4)
 - Gallery images stored as RGBA PNGs at ≤600×400 with transparency preserved
-- Background color compositing happens at display time (via ?bg=RRGGBB), not upload time
+- Active display state is stored beside the gallery in `.display_state.json`
+- Background/scale/crop/color compositing happens at display time, not upload time
 - Display access serialized via threading.Lock() (serial loop + web routes share one display)
 - Driver timing defaults are conservative for first hardware bring-up:
   `EINK_SPI_HZ=4000000`, `EINK_RESET_SETTLE_MS=20`,
@@ -81,8 +84,11 @@ tests/
 ## Commands
 
 ```bash
-# Run all tests (80 tests)
+# Run all tests (121 tests)
 make test
+
+# Run mocked local web UI smoke server
+python3 tools/smoke_web_ui.py
 
 # Run on the Pi after cloning/pulling locally
 make install-code APP_DIR=/opt/e-ink-gadget
@@ -109,6 +115,7 @@ make clean
 | Flask web UI runs in same process (daemon thread) | 2026-06-02 | Settled |
 | Alpha preserved at upload, bg composite at display time | 2026-06-02 | Settled |
 | Gallery storage: /home/pi/eink-gadget/gallery/ | 2026-06-02 | Settled |
+| Web UI layout: current-display editor with bottom gallery strip | 2026-06-03 | Settled |
 
 ## Next Step
 
